@@ -673,12 +673,8 @@ struct EmptyStateView: View {
 
                 Button(action: onConnect) {
                     Label("Connect a provider", systemImage: "plus")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, Theme.Space.s)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+                .buttonStyle(PrimaryButtonStyle())
                 .padding(.horizontal, Theme.Space.xxl)
 
                 Text("\(ProviderRegistry.all.count) providers supported")

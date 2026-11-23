@@ -127,7 +127,63 @@ enum WebSession {
     }
 }
 
+// MARK: - Prewarming
+
+/// The ChatGPT login page is a heavy client-rendered app; on a phone its first
+/// paint can take tens of seconds, which looked like a dead white sheet. The
+/// provider screen starts loading it the moment it appears, so the page is
+/// usually ready by the time "Sign in" is tapped.
+@MainActor
+final class WebSignInPrewarmer {
+    static let shared = WebSignInPrewarmer()
+
+    /// A warmed page older than this is replaced — its CSRF state may be stale.
+    private let maxAge: TimeInterval = 240
+    private var warm: [WebSignInKind: (view: WKWebView, created: Date)] = [:]
+
+    func prewarm(_ kind: WebSignInKind) {
+        if let entry = warm[kind], Date().timeIntervalSince(entry.created) < maxAge { return }
+        warm[kind] = (Self.makeWebView(for: kind), Date())
+    }
+
+    /// Hands over the warmed view (or a fresh one) and forgets it, so a page
+    /// is never shared between two sign-ins.
+    func take(_ kind: WebSignInKind) -> WKWebView {
+        defer { warm[kind] = nil }
+        if let entry = warm[kind], Date().timeIntervalSince(entry.created) < maxAge {
+            return entry.view
+        }
+        return Self.makeWebView(for: kind)
+    }
+
+    static func makeWebView(for kind: WebSignInKind) -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        // Non-persistent: the session lives only in the Keychain afterwards,
+        // not in a web data store that outlives this sheet.
+        configuration.websiteDataStore = .nonPersistent()
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.customUserAgent = WebSession.userAgent
+        // Never flash white: the sheet's own canvas shows through until the
+        // page paints.
+        webView.isOpaque = false
+        webView.backgroundColor = .clear
+        webView.scrollView.backgroundColor = .clear
+        webView.load(URLRequest(url: kind.loginURL))
+        return webView
+    }
+}
+
 // MARK: - Sign-in sheet
+
+enum SignInPhase: Equatable {
+    /// The first page has not painted yet.
+    case loading
+    /// Still nothing after a long wait — offer a retry, keep loading.
+    case slow
+    /// The page is on screen.
+    case ready
+    case failed(String)
+}
 
 /// The provider's own login page in a private, throwaway web view. Nothing
 /// typed here is read by the app; it waits for the session cookie and then
@@ -137,122 +193,302 @@ struct WebSignInView: View {
     var onCredential: (String) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var isLoading = true
+    @State private var phase: SignInPhase = .loading
+    @State private var progress: Double = 0
+    @State private var isNavigating = true
+    @State private var retryToken = 0
 
     var body: some View {
         NavigationStack {
-            SignInWebView(kind: kind, isLoading: $isLoading) { credential in
-                onCredential(credential)
-                dismiss()
+            ZStack {
+                Theme.canvas.ignoresSafeArea()
+                SignInWebView(kind: kind, phase: $phase, progress: $progress,
+                              isNavigating: $isNavigating, retryToken: retryToken) { credential in
+                    onCredential(credential)
+                    dismiss()
+                }
+                .opacity(phase == .ready ? 1 : 0)
+                .ignoresSafeArea(edges: .bottom)
+
+                if phase != .ready {
+                    SignInLoadingPanel(kind: kind, phase: phase, progress: progress) {
+                        phase = .loading
+                        progress = 0
+                        retryToken += 1
+                    }
+                    .transition(.opacity)
+                }
             }
-            .ignoresSafeArea(edges: .bottom)
+            .animation(.snappy, value: phase)
             .overlay(alignment: .top) {
-                if isLoading { ProgressView().padding(.top, 12) }
+                if phase == .ready && isNavigating {
+                    SegmentedMeter(fraction: max(progress, 0.08), height: 3, segment: 6, gap: 2,
+                                   showsSeverity: false)
+                        .padding(.horizontal, Theme.Space.l)
+                        .padding(.top, Theme.Space.xs)
+                        .transition(.opacity)
+                }
             }
             .safeAreaInset(edge: .bottom) {
                 Text("Sign in with email if a Google or Apple button is refused — some "
                    + "identity providers block in-app browsers. Open Quota never sees your password.")
-                    .font(.caption)
+                    .font(.mono(.caption2))
                     .foregroundStyle(Theme.inkSecondary)
-                    .padding(12)
-                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, Theme.Space.l)
+                    .padding(.vertical, Theme.Space.m)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .background(.bar)
             }
             .navigationTitle("Sign in to \(kind.serviceName)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", role: .cancel) { dismiss() }
+                    Button(role: .cancel) { dismiss() }
                 }
             }
         }
     }
 }
 
+/// What the sheet shows until the provider's page has actually painted:
+/// a terminal-style status line with real load progress, then a retry.
+private struct SignInLoadingPanel: View {
+    let kind: WebSignInKind
+    let phase: SignInPhase
+    let progress: Double
+    let retry: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Space.l) {
+            HStack(spacing: 0) {
+                Text("❯ ").foregroundStyle(Theme.brand)
+                Text(kind.loginURL.host() ?? kind.host).foregroundStyle(Theme.ink)
+                Text(kind.loginURL.path()).foregroundStyle(Theme.inkTertiary)
+            }
+            .font(.mono(.subheadline, weight: .semibold))
+            .lineLimit(1)
+
+            switch phase {
+            case .failed(let message):
+                status("ERR", message, color: Theme.critical)
+                retryButton
+            case .slow:
+                SegmentedMeter(fraction: max(progress, 0.05), height: 8, showsSeverity: false)
+                status("WAIT", "\(kind.host) is slow to respond. It can take up to a minute "
+                       + "on a weak connection.", color: Theme.watch)
+                retryButton
+            default:
+                SegmentedMeter(fraction: max(progress, 0.05), height: 8, showsSeverity: false)
+                Text("loading the \(kind.serviceName.lowercased()) sign-in page…")
+                    .font(.mono(.caption))
+                    .foregroundStyle(Theme.inkSecondary)
+            }
+        }
+        .card()
+        .padding(.horizontal, Theme.Spacing.page)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .padding(.top, Theme.Space.xl)
+    }
+
+    private func status(_ tag: String, _ text: String, color: Color) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s) {
+            Text(tag)
+                .font(.mono(.caption2, weight: .bold))
+                .foregroundStyle(color)
+                .padding(.horizontal, Theme.Space.xs)
+                .padding(.vertical, Theme.Space.xxs)
+                .background(color.opacity(Theme.Wash.dark), in: RoundedRectangle(cornerRadius: Theme.Radius.tag))
+            Text(text)
+                .font(.mono(.caption))
+                .foregroundStyle(Theme.inkSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var retryButton: some View {
+        Button(action: retry) {
+            Label("Try again", systemImage: "arrow.clockwise")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(PrimaryButtonStyle())
+    }
+}
+
 private struct SignInWebView: UIViewRepresentable {
     let kind: WebSignInKind
-    @Binding var isLoading: Bool
+    @Binding var phase: SignInPhase
+    @Binding var progress: Double
+    @Binding var isNavigating: Bool
+    var retryToken: Int
     var onCredential: (String) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeUIView(context: Context) -> WKWebView {
-        let configuration = WKWebViewConfiguration()
-        // Non-persistent: the session lives only in the Keychain afterwards,
-        // not in a web data store that outlives this sheet.
-        configuration.websiteDataStore = .nonPersistent()
-        let webView = WKWebView(frame: .zero, configuration: configuration)
-        webView.customUserAgent = WebSession.userAgent
-        webView.navigationDelegate = context.coordinator
-        configuration.websiteDataStore.httpCookieStore.add(context.coordinator)
-        webView.load(URLRequest(url: kind.loginURL))
+        let webView = WebSignInPrewarmer.shared.take(kind)
+        context.coordinator.attach(to: webView, retryToken: retryToken)
         return webView
     }
 
-    func updateUIView(_ webView: WKWebView, context: Context) {}
+    func updateUIView(_ webView: WKWebView, context: Context) {
+        context.coordinator.parent = self
+        guard context.coordinator.lastRetryToken != retryToken else { return }
+        context.coordinator.lastRetryToken = retryToken
+        context.coordinator.reload(webView)
+    }
 
     static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
-        webView.configuration.websiteDataStore.httpCookieStore.remove(coordinator)
+        coordinator.detach(from: webView)
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKHTTPCookieStoreObserver {
-        private let parent: SignInWebView
+        var parent: SignInWebView
+        var lastRetryToken = 0
         private var delivered = false
+        private var paintPoll: Timer?
+        private var slowTimer: Timer?
+        private var progressObservation: NSKeyValueObservation?
+        private var loadingObservation: NSKeyValueObservation?
 
         init(_ parent: SignInWebView) { self.parent = parent }
+
+        func attach(to webView: WKWebView, retryToken: Int) {
+            lastRetryToken = retryToken
+            webView.navigationDelegate = self
+            webView.configuration.websiteDataStore.httpCookieStore.add(self)
+            progressObservation = webView.observe(\.estimatedProgress, options: [.initial, .new]) { [weak self] view, _ in
+                let value = view.estimatedProgress
+                DispatchQueue.main.async { self?.parent.progress = value }
+            }
+            loadingObservation = webView.observe(\.isLoading, options: [.initial, .new]) { [weak self] view, _ in
+                let loading = view.isLoading
+                DispatchQueue.main.async { self?.parent.isNavigating = loading }
+            }
+            startWaiting(webView)
+            // A warmed page may already be signed in or painted.
+            cookiesDidChange(in: webView.configuration.websiteDataStore.httpCookieStore)
+        }
+
+        func detach(from webView: WKWebView) {
+            stopTimers()
+            progressObservation = nil
+            loadingObservation = nil
+            webView.stopLoading()
+            webView.navigationDelegate = nil
+            webView.configuration.websiteDataStore.httpCookieStore.remove(self)
+        }
+
+        func reload(_ webView: WKWebView) {
+            delivered = false
+            webView.stopLoading()
+            webView.load(URLRequest(url: parent.kind.loginURL))
+            startWaiting(webView)
+        }
+
+        /// Polls until the page has drawn real content — `didFinish` alone
+        /// arrives long after the login form is usable on this site, and a
+        /// committed-but-unhydrated page is exactly the white screen.
+        private func startWaiting(_ webView: WKWebView) {
+            stopTimers()
+            paintPoll = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self, weak webView] _ in
+                guard let self, let webView else { return }
+                self.checkPainted(webView)
+            }
+            slowTimer = Timer.scheduledTimer(withTimeInterval: 20, repeats: false) { [weak self] _ in
+                guard let self, self.parent.phase == .loading else { return }
+                self.parent.phase = .slow
+            }
+        }
+
+        private func stopTimers() {
+            paintPoll?.invalidate()
+            paintPoll = nil
+            slowTimer?.invalidate()
+            slowTimer = nil
+        }
+
+        private func checkPainted(_ webView: WKWebView) {
+            guard webView.url?.scheme == "https" else { return }
+            let script = "!!(document.body && document.body.innerText.trim().length > 0)"
+            webView.evaluateJavaScript(script) { [weak self] result, _ in
+                guard let self, (result as? Bool) == true else { return }
+                self.markReady()
+            }
+        }
+
+        private func markReady() {
+            stopTimers()
+            if parent.phase != .ready { parent.phase = .ready }
+        }
 
         func cookiesDidChange(in cookieStore: WKHTTPCookieStore) {
             cookieStore.getAllCookies { [weak self] cookies in
                 guard let self, !self.delivered,
                       let credential = self.parent.kind.credential(from: cookies) else { return }
-                self.delivered = true
-                DispatchQueue.main.async { self.parent.onCredential(credential) }
+                self.deliver(credential)
             }
         }
 
-        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-            parent.isLoading = true
+        private func deliver(_ credential: String) {
+            guard !delivered else { return }
+            delivered = true
+            stopTimers()
+            DispatchQueue.main.async { self.parent.onCredential(credential) }
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            parent.isLoading = false
+            markReady()
             cookiesDidChange(in: webView.configuration.websiteDataStore.httpCookieStore)
             verifySession(in: webView)
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-            parent.isLoading = false
+            fail(error)
         }
 
-        /// The cookie observer alone missed completions when login moved to
-        /// auth.openai.com (cookie names rotate, observer fires late), so the
-        /// sheet stayed open after a successful sign-in. After every finished
-        /// navigation, ask the page itself: fetch the session endpoint with
-        /// the page's own cookies and finish when it reports a live session.
-        /// Only chatgpt.com's own pages run the probe — the auth domain's
-        /// fetch would be cross-origin and useless anyway.
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!,
+                     withError error: Error) {
+            fail(error)
+        }
+
+        private func fail(_ error: Error) {
+            let nsError = error as NSError
+            // Cancelled loads are redirects or our own retry, not failures.
+            guard nsError.code != NSURLErrorCancelled, !delivered else { return }
+            // Once the page is up, a failed sub-navigation is the site's own
+            // business — it shows its own error and the user can go back.
+            guard parent.phase != .ready else { return }
+            stopTimers()
+            parent.phase = .failed("\(parent.kind.host) couldn't be reached. Check your connection, "
+                                   + "then try again. (\(nsError.localizedDescription))")
+        }
+
+        /// The cookie observer alone misses completions when login bounces
+        /// through auth.openai.com (cookie names rotate, the observer fires
+        /// late). After every finished navigation on chatgpt.com, ask the page
+        /// itself whether it has a live session. `callAsyncJavaScript` awaits
+        /// the fetch — `evaluateJavaScript` would hand back an unresolved
+        /// Promise and never finish the sign-in.
         private func verifySession(in webView: WKWebView) {
-            guard !delivered else { return }
+            guard !delivered, parent.kind == .chatgpt,
+                  let host = webView.url?.host, host.hasSuffix("chatgpt.com"),
+                  webView.url?.path != "/auth/login" else { return }
+            let script = """
+                try {
+                    const response = await fetch('/api/auth/session', { credentials: 'include' });
+                    const session = await response.json();
+                    return String(session.accessToken || '');
+                } catch (error) { return ''; }
+                """
             let kind = parent.kind
-            switch kind {
-            case .chatgpt:
-                guard let host = webView.url?.host, host.hasSuffix("chatgpt.com"),
-                      webView.url?.path != "/auth/login" else { return }
-                let script = "fetch('/api/auth/session',{credentials:'include'})"
-                    + ".then(r=>r.json()).then(s=>String(s.accessToken||''))"
-                    + ".catch(()=>'')"
-                webView.evaluateJavaScript(script) { [weak self] result, _ in
-                    guard let self, !self.delivered,
-                          let token = result as? String, !token.isEmpty else { return }
-                    webView.configuration.websiteDataStore.httpCookieStore.getAllCookies {
-                        cookies in
-                        guard let credential = kind.credential(from: cookies) else { return }
-                        self.delivered = true
-                        DispatchQueue.main.async { self.parent.onCredential(credential) }
-                    }
+            webView.callAsyncJavaScript(script, arguments: [:], in: nil, in: .page) { [weak self] result in
+                guard let self, !self.delivered,
+                      case .success(let value) = result,
+                      let token = value as? String, !token.isEmpty else { return }
+                webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { cookies in
+                    guard let credential = kind.credential(from: cookies) else { return }
+                    self.deliver(credential)
                 }
-            case .claude:
-                break
             }
         }
     }

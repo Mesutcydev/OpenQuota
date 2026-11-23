@@ -92,25 +92,26 @@ struct OnboardingView: View {
                 ZStack {
                     Text(isLast ? "connect a provider" : "continue")
                         .font(.mono(.headline, weight: .semibold))
-                        .foregroundStyle(Color(hex: "F2F3F5"))
+                        .foregroundStyle(Theme.onAccent)
                         .contentTransition(.opacity)
                         .padding(.horizontal, 60)
                     HStack {
                         Spacer()
                         Image(systemName: isLast ? "plus" : "arrow.right")
                             .font(.system(size: 17, weight: .bold))
-                            .foregroundStyle(Color(hex: "F2F3F5"))
+                            .foregroundStyle(Theme.onAccent)
                             .contentTransition(.symbolEffect(.replace))
                             .symbolEffect(.bounce, value: page)
-                            .frame(width: 46, height: 46)
-                            .background(Color.white.opacity(0.14), in: Circle())
+                            .frame(width: 40, height: 40)
+                            .background(Theme.onAccent.opacity(0.08),
+                                        in: RoundedRectangle(cornerRadius: Theme.Radius.control, style: .continuous))
                     }
-                    .padding(.trailing, 6)
+                    .padding(.trailing, 5)
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 58)
-                .background(Theme.buttonTint, in: Capsule())
-                .shadow(color: Theme.buttonTint.opacity(0.28), radius: 14, y: 6)
+                .frame(height: 50)
+                .background(Theme.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.control + 4,
+                                                               style: .continuous))
                 .animation(.snappy, value: isLast)
             }
             .buttonStyle(PressableCardStyle())

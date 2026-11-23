@@ -29,7 +29,8 @@ struct AccountsView: View {
                         Text("Connected providers appear here.")
                     } actions: {
                         Button("Connect a provider") { router.showingConnect = true }
-                            .buttonStyle(.glassProminent)
+                            .buttonStyle(PrimaryButtonStyle())
+                            .frame(maxWidth: 260)
                     }
                 } else {
                     list
@@ -77,7 +78,7 @@ struct AccountsView: View {
                         Button {
                             Task { await model.refresh(account) }
                         } label: { Label("Refresh", systemImage: "arrow.clockwise") }
-                            .tint(Theme.brand)
+                            .tint(Theme.brandDeep)
                     }
                     .listRowBackground(Theme.rowFill)
                     .swipeActions(edge: .trailing) {
@@ -113,34 +114,43 @@ struct AccountRow: View {
             ProviderGlyph(descriptor: descriptor, size: Theme.Glyph.row)
             VStack(alignment: .leading, spacing: Theme.Space.xs) {
                 Text(account.nickname)
-                    .font(.body.weight(.semibold))
+                    .font(.mono(.subheadline, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
                     .lineLimit(1)
                 HStack(spacing: Theme.Space.xs) {
                     if state.errorMessage != nil {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(Theme.critical)
+                        Text("ERR").font(.mono(.caption2, weight: .bold)).foregroundStyle(Theme.critical)
                     }
-                    Text(descriptor.name)
+                    Text(descriptor.name.lowercased())
                 }
-                .font(.caption)
-                .foregroundStyle(Theme.inkSecondary)
+                .font(.mono(.caption2))
+                .foregroundStyle(Theme.inkTertiary)
                 .lineLimit(1)
             }
-            Spacer(minLength: 8)
-            if state.isLoading {
+            Spacer(minLength: Theme.Space.s)
+            if state.isLoading && snapshot == nil {
                 ProgressView().controlSize(.small)
             } else if let headline = snapshot?.headline {
-                VStack(alignment: .trailing, spacing: Theme.Space.xs) {
+                VStack(alignment: .trailing, spacing: Theme.Space.s) {
                     Text(MetricText.value(headline))
-                        .font(.system(.subheadline, design: .monospaced).weight(.semibold))
+                        .font(.mono(.callout, weight: .semibold))
                         .monospacedDigit()
+                        .foregroundStyle(headline.fraction.map { Theme.severity($0, tint: Theme.ink) } ?? Theme.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                     if let fraction = headline.fraction {
-                        BlockBar(fraction: fraction, cells: 8, font: .mono(.caption2))
+                        SegmentedMeter(fraction: fraction, height: 6, segment: 4, gap: 2)
+                            .frame(width: 70)
+                    } else {
+                        Text(headline.title.lowercased())
+                            .font(.mono(.caption2))
+                            .foregroundStyle(Theme.inkTertiary)
+                            .lineLimit(1)
                     }
                 }
             }
         }
-        .padding(.vertical, Theme.Space.xxs)
+        .padding(.vertical, Theme.Space.xs)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(snapshot?.headline.map { MetricText.accessibility($0, name: account.nickname) }
                             ?? account.nickname)

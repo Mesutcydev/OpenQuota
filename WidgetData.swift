@@ -138,18 +138,47 @@ enum WidgetStore {
         return try? JSONDecoder().decode(WidgetBoard.self, from: data)
     }
 
-    /// Shown by the widget's placeholder and before the first app refresh.
-    static let sample = WidgetBoard(
-        updatedAt: Date().addingTimeInterval(-300),
-        entries: [
-            WidgetEntry(
-                id: UUID(), nickname: "Personal key", providerName: "OpenRouter",
-                creditLeft: 8.82, fraction: 0.82, tintHex: "6467F2",
-                headlineText: "$8.82", headlineTitle: "Credits left"),
-            WidgetEntry(
-                id: UUID(), nickname: "Novita AI", providerName: "Novita AI",
-                creditLeft: 100.00, fraction: nil, tintHex: "23D18B",
-                headlineText: "$100.00", headlineTitle: "Balance"),
-        ],
-        usdTotal: 108.82)
+    /// Shown by the widget's placeholder and gallery, and before the first
+    /// app refresh: one account per state the design has to carry — calm,
+    /// watch, critical, and a balance with no limit.
+    static let sample: WidgetBoard = {
+        let now = Date()
+        return WidgetBoard(
+            updatedAt: now.addingTimeInterval(-300),
+            entries: [
+                WidgetEntry(
+                    id: UUID(), nickname: "Claude Max", providerName: "Claude",
+                    creditLeft: nil, fraction: 0.64, tintHex: "D97757",
+                    headlineText: "64%", headlineTitle: "5-hour window",
+                    resetsAt: now.addingTimeInterval(2 * 3600 + 840),
+                    windows: [
+                        WidgetWindow(id: "5h", title: "5-hour window", fraction: 0.64, valueText: "64%",
+                                     resetsAt: now.addingTimeInterval(2 * 3600 + 840)),
+                        WidgetWindow(id: "7d", title: "Weekly", fraction: 0.41, valueText: "41%",
+                                     resetsAt: now.addingTimeInterval(3 * 86400)),
+                    ]),
+                WidgetEntry(
+                    id: UUID(), nickname: "Personal key", providerName: "OpenRouter",
+                    creditLeft: 8.82, fraction: 0.82, tintHex: "6467F2",
+                    headlineText: "$8.82", headlineTitle: "Credits left",
+                    windows: [WidgetWindow(id: "credit", title: "Credit used", fraction: 0.82,
+                                           valueText: "$8.82", resetsAt: nil)]),
+                WidgetEntry(
+                    id: UUID(), nickname: "Codex", providerName: "ChatGPT",
+                    creditLeft: nil, fraction: 0.93, tintHex: "10A37F",
+                    headlineText: "93%", headlineTitle: "Weekly limit",
+                    resetsAt: now.addingTimeInterval(86400 + 3600),
+                    windows: [WidgetWindow(id: "7d", title: "Weekly limit", fraction: 0.93, valueText: "93%",
+                                           resetsAt: now.addingTimeInterval(86400 + 3600))]),
+                WidgetEntry(
+                    id: UUID(), nickname: "Novita AI", providerName: "Novita AI",
+                    creditLeft: 100.00, fraction: nil, tintHex: "23D18B",
+                    headlineText: "$100.00", headlineTitle: "Balance"),
+            ],
+            usdTotal: 108.82,
+            monthSpend: 412.40,
+            budget: 600,
+            projectedSpend: 538.10,
+            todaySpend: 18.25)
+    }()
 }

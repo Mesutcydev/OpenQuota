@@ -639,6 +639,9 @@ final class AppModel {
         withSpend.recentDaily = days.isEmpty ? nil : (0..<28).reversed().map { back in
             byDay[calendar.date(byAdding: .day, value: -back, to: today)!] ?? 0
         }
+        // Reloads come out of a daily budget: spending one on an unchanged
+        // board leaves the widget stale later in the day.
+        guard withSpend != WidgetStore.load() else { return }
         WidgetStore.save(withSpend)
         WatchSync.shared.send(withSpend)
         WidgetCenter.shared.reloadAllTimelines()

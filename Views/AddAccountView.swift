@@ -179,26 +179,24 @@ struct ConnectFormView: View {
                     Button {
                         signingIn = true
                     } label: {
-                        HStack {
-                            Spacer()
+                        HStack(spacing: Theme.Space.s) {
                             if isConnecting {
-                                ProgressView().tint(.white)
-                                Text("Checking session…")
+                                ProgressView().tint(Theme.onAccent)
+                                Text("checking session…")
                             } else {
-                                Label("Sign in to \(kind.serviceName)", systemImage: "person.badge.key.fill")
+                                Image(systemName: "person.badge.key.fill")
+                                Text("Sign in to \(kind.serviceName)")
                             }
-                            Spacer()
                         }
-                        .font(.headline)
-                        .padding(.vertical, Theme.Space.s)
                     }
-                    .buttonStyle(.glassProminent)
+                    .buttonStyle(PrimaryButtonStyle())
                     .disabled(isConnecting)
                 } footer: {
-                    VStack(alignment: .leading, spacing: Theme.Space.s) {
-                        if let caveat = descriptor.caveat { Text(caveat) }
+                    if let caveat = descriptor.caveat {
+                        Text(caveat)
+                            .padding(.top, Theme.Space.m)
+                            .padding(.horizontal, Theme.Space.xs)
                     }
-                    .padding(.top, Theme.Space.s)
                 }
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
@@ -263,23 +261,21 @@ struct ConnectFormView: View {
             if descriptor.webSignIn == nil {
             Section {
                 Button(action: connect) {
-                    HStack {
-                        Spacer()
+                    HStack(spacing: Theme.Space.s) {
                         if isConnecting {
-                            ProgressView().tint(.white)
-                            Text("Checking key…")
+                            ProgressView().tint(Theme.onAccent)
+                            Text("checking key…")
                         } else {
                             Text("Connect")
                         }
-                        Spacer()
                     }
-                    .font(.headline)
-                    .padding(.vertical, Theme.Space.s)
                 }
-                .buttonStyle(.glassProminent)
+                .buttonStyle(PrimaryButtonStyle())
                 .disabled(!canConnect)
             } footer: {
                 Text("Open Quota makes one read-only call to confirm the key works before saving it.")
+                    .padding(.top, Theme.Space.m)
+                    .padding(.horizontal, Theme.Space.xs)
             }
             .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
@@ -292,6 +288,10 @@ struct ConnectFormView: View {
                     connect()
                 }
             }
+        }
+        .listSectionSpacing(Theme.Space.xl)
+        .task {
+            if let kind = descriptor.webSignIn { WebSignInPrewarmer.shared.prewarm(kind) }
         }
         .scrollContentBackground(.hidden)
         .background { CanvasBackground() }

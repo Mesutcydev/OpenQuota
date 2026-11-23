@@ -6,6 +6,10 @@ import AppIntents
 /// last refresh (every account's headline figure) and lays it out for every
 /// widget family the system offers — Home Screen small/medium/large and the
 /// Lock Screen accessories.
+///
+/// The look mirrors the app's dashboard: a `▍ TITLE` panel header, monospaced
+/// type, and segmented meters drawn in calm ink that only turn amber (75%) or
+/// red (90%) when a limit is actually at stake.
 @main
 struct OpenQuotaWidgets: WidgetBundle {
     var body: some Widget {
@@ -22,26 +26,318 @@ struct BoardEntry: TimelineEntry {
     let board: WidgetBoard
 }
 
+/// One timeline for every widget: an entry now, then one at each upcoming
+/// limit reset, so a 5-hour window that rolls over shows "reset" on time
+/// instead of its stale load until the app next runs.
+enum BoardTimeline {
+    /// The app reloads timelines after each refresh that changed the board;
+    /// this is only the safety tick for days the app never runs.
+    static let refreshInterval: TimeInterval = 6 * 3600
+
+    static var current: WidgetBoard { WidgetStore.load() ?? WidgetStore.sample }
+
+    static func dates(for board: WidgetBoard, from now: Date = Date()) -> [Date] {
+        let horizon = now.addingTimeInterval(refreshInterval)
+        let resets = board.entries.flatMap { entry in
+            [entry.resetsAt].compactMap { $0 } + (entry.windows ?? []).compactMap(\.resetsAt)
+        }
+        let upcoming = Set(resets.filter { $0 > now && $0 < horizon }).sorted().prefix(12)
+        return [now] + upcoming
+    }
+
+    static func timeline<Entry: TimelineEntry>(make: (Date, WidgetBoard) -> Entry) -> Timeline<Entry> {
+        let board = current
+        let now = Date()
+        let entries = dates(for: board, from: now).map { make($0, board.asOf($0)) }
+        return Timeline(entries: entries, policy: .after(now.addingTimeInterval(refreshInterval)))
+    }
+}
+
 struct BoardProvider: TimelineProvider {
     func placeholder(in context: Context) -> BoardEntry {
         BoardEntry(date: Date(), board: WidgetStore.sample)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (BoardEntry) -> Void) {
-        completion(BoardEntry(date: Date(), board: WidgetStore.load() ?? WidgetStore.sample))
+        completion(BoardEntry(date: Date(), board: BoardTimeline.current.asOf(Date())))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<BoardEntry>) -> Void) {
-        let board = WidgetStore.load() ?? WidgetStore.sample
-        let entry = BoardEntry(date: Date(), board: board)
-        // The app calls WidgetCenter.reloadAllTimelines() after every refresh,
-        // so WidgetKit only needs a safety tick for days the app never ran.
-        let next = Calendar.current.date(byAdding: .hour, value: 6, to: Date()) ?? Date().addingTimeInterval(21_600)
-        completion(Timeline(entries: [entry], policy: .after(next)))
+        completion(BoardTimeline.timeline { BoardEntry(date: $0, board: $1) })
     }
 }
 
-// MARK: - Widget
+// MARK: - Design tokens
+// The widget extension does not compile the app's Theme, so the handful of
+// tokens it needs are mirrored here with the same values.
+
+enum WTheme {
+    static let surface = adaptive(light: "FFFFFF", dark: "18181B")
+    static let raised = adaptive(light: "EBEDF0", dark: "232327")
+    static let divider = adaptive(light: "10182817", dark: "FFFFFF12")
+    static let track = adaptive(light: "E3E6EA", dark: "2A2A2E")
+
+    static let brand = adaptive(light: "15171A", dark: "ECECEE")
+    static let ink = adaptive(light: "15171A", dark: "F2F2F4")
+    static let inkSecondary = adaptive(light: "5F6670", dark: "9E9EA4")
+    static let inkTertiary = adaptive(light: "9AA0A8", dark: "66666C")
+    static let gauge = adaptive(light: "23262B", dark: "E2E2E6")
+
+    static let watch = adaptive(light: "B86A00", dark: "EFB25A")
+    static let critical = adaptive(light: "C2412F", dark: "F0907F")
+
+    /// Horizontal inset of every Home Screen layout (margins are disabled so
+    /// the header band can run edge to edge).
+    static let inset: CGFloat = 14
+
+    /// Calm ink while healthy, amber from 75%, red from 90% — the app's rule.
+    static func severity(_ fraction: Double, calm: Color = gauge) -> Color {
+        if fraction >= 0.90 { return critical }
+        if fraction >= 0.75 { return watch }
+        return calm
+    }
+
+    static func mono(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
+        .system(size: size, weight: weight, design: .monospaced)
+    }
+
+    static func percent(_ fraction: Double) -> String {
+        "\(Int((min(max(fraction, 0), 9.99) * 100).rounded()))%"
+    }
+
+    private static func adaptive(light: String, dark: String) -> Color {
+        Color(UIColor { traits in
+            uiColor(traits.userInterfaceStyle == .dark ? dark : light)
+        })
+    }
+
+    /// `RRGGBB` or `RRGGBBAA`.
+    private static func uiColor(_ hex: String) -> UIColor {
+        guard let value = UInt64(hex, radix: 16), hex.count == 6 || hex.count == 8 else { return .clear }
+        let alpha = hex.count == 8
+        let r = alpha ? (value >> 24) & 0xFF : (value >> 16) & 0xFF
+        let g = alpha ? (value >> 16) & 0xFF : (value >> 8) & 0xFF
+        let b = alpha ? (value >> 8) & 0xFF : value & 0xFF
+        let a = alpha ? value & 0xFF : 0xFF
+        return UIColor(red: Double(r) / 255, green: Double(g) / 255,
+                       blue: Double(b) / 255, alpha: Double(a) / 255)
+    }
+}
+
+// MARK: - Building blocks
+
+/// The app's `SegmentedMeter`: a full-width row of small blocks, filled in
+/// ink (or amber/red under load) over a quiet track.
+struct Meter: View {
+    let fraction: Double
+    var height: CGFloat = 7
+    var segment: CGFloat = 4
+    var gap: CGFloat = 2
+    var showsSeverity = true
+
+    var body: some View {
+        let clamped = min(max(fraction, 0), 1)
+        let color = showsSeverity ? WTheme.severity(clamped) : WTheme.gauge
+        GeometryReader { proxy in
+            let count = max(Int((proxy.size.width + gap) / (segment + gap)), 1)
+            let filled = clamped > 0 ? max(Int((clamped * Double(count)).rounded()), 1) : 0
+            HStack(spacing: gap) {
+                ForEach(0..<count, id: \.self) { index in
+                    RoundedRectangle(cornerRadius: 1, style: .continuous)
+                        .fill(index < filled ? color : WTheme.track)
+                        .frame(width: segment)
+                        .widgetAccentable(index < filled)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(height: height)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Provider identity: a small square in the provider's own tint — the only
+/// colour a calm widget carries, like the app's glyphs.
+struct TintMark: View {
+    let hex: String?
+    var size: CGFloat = 7
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: size * 0.25, style: .continuous)
+            .fill(Color(hex: hex) ?? WTheme.inkTertiary)
+            .frame(width: size, height: size)
+    }
+}
+
+/// The app's panel title bar: `▍ TITLE [n]` on a raised band with a hairline.
+struct PanelHeader<Trailing: View>: View {
+    @Environment(\.widgetRenderingMode) private var renderingMode
+
+    let title: String
+    var count: Int? = nil
+    @ViewBuilder var trailing: Trailing
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 5) {
+                Text("▍").foregroundStyle(WTheme.brand).widgetAccentable()
+                Text(title)
+                    .lineLimit(1)
+                if let count {
+                    Text("[\(count)]").foregroundStyle(WTheme.inkTertiary)
+                }
+                Spacer(minLength: 4)
+                trailing
+            }
+            .font(WTheme.mono(10, .semibold))
+            .tracking(0.6)
+            .textCase(.uppercase)
+            .foregroundStyle(WTheme.inkSecondary)
+            .padding(.horizontal, WTheme.inset)
+            .frame(height: 30)
+            .background(renderingMode == .fullColor ? WTheme.raised.opacity(0.55) : .clear)
+
+            Rectangle().fill(WTheme.divider).frame(height: 1)
+        }
+    }
+}
+
+extension PanelHeader where Trailing == EmptyView {
+    init(title: String, count: Int? = nil) {
+        self.init(title: title, count: count, trailing: { EmptyView() })
+    }
+}
+
+/// Refresh button for the header (runs in the app's process — the extension
+/// only declares it).
+struct RefreshButton: View {
+    var body: some View {
+        Button(intent: RefreshFromWidgetIntent()) {
+            Image(systemName: "arrow.clockwise")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(WTheme.inkSecondary)
+                .frame(width: 22, height: 22)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Refresh")
+    }
+}
+
+/// One account on one line, like a row of the app's providers table:
+/// `■ nickname ········ ▮▮▮▮▮▯▯▯  $8.82`.
+struct TableRow: View {
+    let entry: WidgetEntry
+    var meterWidth: CGFloat = 70
+
+    var body: some View {
+        Link(destination: entry.deepLink) {
+            HStack(spacing: 8) {
+                TintMark(hex: entry.tintHex)
+                Text(entry.nickname.lowercased())
+                    .font(WTheme.mono(11, .semibold))
+                    .foregroundStyle(WTheme.ink)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Group {
+                    if let fraction = entry.fraction {
+                        Meter(fraction: fraction, height: 7, segment: 3, gap: 1.5)
+                    } else {
+                        Text(entry.caption)
+                            .font(WTheme.mono(8.5))
+                            .foregroundStyle(WTheme.inkTertiary)
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+                }
+                .frame(width: meterWidth)
+                Text(entry.headlineText ?? "—")
+                    .font(WTheme.mono(11, .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(entry.valueColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .frame(width: 62, alignment: .trailing)
+            }
+            .padding(.horizontal, WTheme.inset)
+            .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
+        }
+    }
+}
+
+/// One account on two lines — name and figure, then a full-width meter —
+/// for the narrow layouts.
+struct StackRow: View {
+    let entry: WidgetEntry
+
+    var body: some View {
+        Link(destination: entry.deepLink) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    TintMark(hex: entry.tintHex, size: 6)
+                    Text(entry.nickname.lowercased())
+                        .font(WTheme.mono(10, .semibold))
+                        .foregroundStyle(WTheme.ink)
+                        .lineLimit(1)
+                    Spacer(minLength: 4)
+                    Text(entry.headlineText ?? "—")
+                        .font(WTheme.mono(10, .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(entry.valueColor)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                }
+                if let fraction = entry.fraction {
+                    HStack(spacing: 6) {
+                        Meter(fraction: fraction, height: 6, segment: 3, gap: 1.5)
+                        // The figure above is already a percentage for
+                        // plan windows; only money figures need the load.
+                        if !(entry.headlineText ?? "").hasSuffix("%") {
+                            Text(WTheme.percent(fraction))
+                                .font(WTheme.mono(8.5, .medium))
+                                .monospacedDigit()
+                                .foregroundStyle(WTheme.severity(fraction, calm: WTheme.inkTertiary))
+                                .frame(width: 28, alignment: .trailing)
+                        }
+                    }
+                } else {
+                    Text(entry.caption)
+                        .font(WTheme.mono(8.5))
+                        .foregroundStyle(WTheme.inkTertiary)
+                        .lineLimit(1)
+                        .frame(height: 6)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+    }
+}
+
+/// Hairline between table rows, inset like the app's lists.
+struct RowDivider: View {
+    var body: some View {
+        Rectangle().fill(WTheme.divider).frame(height: 1)
+            .padding(.leading, WTheme.inset + 15)
+    }
+}
+
+struct EmptyBoard: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("no accounts yet")
+                .font(WTheme.mono(12, .semibold))
+                .foregroundStyle(WTheme.inkSecondary)
+            Text("❯ add one in open quota")
+                .font(WTheme.mono(9))
+                .foregroundStyle(WTheme.inkTertiary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(WTheme.inset)
+    }
+}
+
+// MARK: - Board widget
 
 struct BoardWidget: Widget {
     var body: some WidgetConfiguration {
@@ -54,6 +350,7 @@ struct BoardWidget: Widget {
             .systemSmall, .systemMedium, .systemLarge,
             .accessoryInline, .accessoryCircular, .accessoryRectangular,
         ])
+        .contentMarginsDisabled()
     }
 }
 
@@ -65,7 +362,7 @@ struct BoardView: View {
     var body: some View {
         content
             .fontDesign(.monospaced)
-            .widgetCanvas(board)
+            .widgetCanvas()
     }
 
     @ViewBuilder
@@ -81,231 +378,174 @@ struct BoardView: View {
     }
 }
 
-// MARK: - Home Screen families
-
-/// Small: the aggregate headline — total USD credits left, account count,
-/// month spend — with a tap that opens the app.
+/// Small: the headline figure, then the most loaded accounts as meters.
 struct SmallBoard: View {
     let board: WidgetBoard
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("openquota")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 0)
-            if let total = board.usdTotal {
-                Text(total, format: .currency(code: "USD"))
-                    .font(.system(size: 25, weight: .bold))
-                    .foregroundStyle(board.headlineGradient)
+        VStack(alignment: .leading, spacing: 0) {
+            PanelHeader(title: board.heroTitle, count: board.entries.count)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(board.heroFigure)
+                    .font(WTheme.mono(22, .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(WTheme.ink)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.55)
-                Text("credits left")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-            } else if let first = board.entries.first {
-                Text(first.headlineText ?? "—")
-                    .font(.system(size: 21, weight: .bold))
-                    .foregroundStyle(board.headlineGradient)
+                    .minimumScaleFactor(0.5)
+                Text(board.shortCaption)
+                    .font(WTheme.mono(9))
+                    .foregroundStyle(WTheme.inkTertiary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.55)
-                Text(first.nickname)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            } else {
-                Text("No data yet")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 0)
-            HStack(spacing: 4) {
-                Text("\(board.entries.count)")
-                    .font(.system(size: 10, weight: .semibold))
-                Text(board.entries.count == 1 ? "account" : "accounts")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                if let spend = board.monthSpend {
-                    Text("/mo \(spend, format: .currency(code: "USD"))")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
+                Spacer(minLength: 6)
+                VStack(alignment: .leading, spacing: 7) {
+                    ForEach(board.byLoad.prefix(2)) { entry in
+                        StackRow(entry: entry)
+                    }
                 }
             }
+            .padding(.horizontal, WTheme.inset)
+            .padding(.top, 9)
+            .padding(.bottom, 13)
         }
         .widgetURL(URL(string: "openquota://"))
     }
 }
 
-/// Shared header: brand, month spend, refresh button (runs in the app's
-/// process — the extension only declares it).
-struct BoardHeader: View {
-    let board: WidgetBoard
-    var showRefresh: Bool
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Text("openquota")
-                .font(.system(size: 11, weight: .bold))
-            Spacer(minLength: 4)
-            if let spend = board.monthSpend {
-                Text("spent \(spend, format: .currency(code: "USD"))")
-                    .font(.system(size: 10))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
-            if showRefresh {
-                Button(intent: RefreshFromWidgetIntent()) {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 11, weight: .semibold))
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .foregroundStyle(.secondary)
-    }
-}
-
-/// Shared row: one account, tinted, deep-linking to its detail screen.
-/// Follows the app's row design: a raised surface card whose only colour is
-/// the provider's own tint — tinted gradient bar, tinted value — shifting to
-/// the app's watch-orange / critical-red as the allowance burns down.
-struct AccountRow: View {
-    @Environment(\.colorScheme) private var scheme
-
-    let entry: WidgetEntry
-
-    private var tint: Color {
-        Color(hex: entry.tintHex) ?? .accentColor
-    }
-
-    /// App severity: provider tint while healthy, watch from 75%, critical from 90%.
-    private func barColor(_ fraction: Double) -> Color {
-        if fraction >= 0.90 { return scheme == .dark ? Color(hex: "F0907F")! : Color(hex: "C2412F")! }
-        if fraction >= 0.75 { return scheme == .dark ? Color(hex: "EFB25A")! : Color(hex: "B86A00")! }
-        return tint
-    }
-
-    var body: some View {
-        Link(destination: URL(string: "openquota://account/\(entry.id.uuidString)")!) {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(tint)
-                    .frame(width: 7, height: 7)
-                    .shadow(color: tint.opacity(0.6), radius: 3)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(entry.nickname)
-                        .font(.system(size: 11, weight: .semibold))
-                        .lineLimit(1)
-                    if let fraction = entry.fraction {
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                Capsule().fill(barColor(fraction).opacity(0.18))
-                                Capsule()
-                                    .fill(LinearGradient(
-                                        colors: [barColor(fraction), barColor(fraction).opacity(0.65)],
-                                        startPoint: .leading, endPoint: .trailing))
-                                    .frame(width: max(3, geo.size.width * fraction))
-                            }
-                        }
-                        .frame(height: 4)
-                    }
-                }
-                Spacer(minLength: 6)
-                VStack(alignment: .trailing, spacing: 1) {
-                    Text(entry.headlineText ?? "—")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(entry.fraction.map(barColor) ?? tint)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                    if let title = entry.headlineTitle {
-                        Text(title)
-                            .font(.system(size: 8))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
-                    }
-                }
-            }
-            .padding(.horizontal, 9)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(LinearGradient(
-                        colors: [tint.opacity(0.14), tint.opacity(0.04)],
-                        startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 11, style: .continuous)
-                            .strokeBorder(tint.opacity(0.20), lineWidth: 1)))
-            .contentShape(Rectangle())
-        }
-    }
-}
-
-/// Medium: every account that fits (up to five rows).
+/// Medium: the app's providers table — one line per account.
 struct MediumBoard: View {
     let board: WidgetBoard
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            BoardHeader(board: board, showRefresh: true)
-            if board.entries.isEmpty {
-                Text("No accounts yet")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(board.entries.prefix(5)) { entry in
-                    AccountRow(entry: entry)
+        VStack(spacing: 0) {
+            PanelHeader(title: "openquota", count: board.entries.count) {
+                if let spend = board.monthSpend {
+                    Text("mtd \(Format.currency(spend))")
+                        .tracking(0)
+                        .textCase(nil)
+                        .monospacedDigit()
                 }
-                if board.entries.count > 5 {
-                    Text("+\(board.entries.count - 5) more — open for all")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                }
+                RefreshButton()
             }
-            Spacer(minLength: 0)
+            if board.entries.isEmpty {
+                EmptyBoard()
+            } else {
+                RowStack(entries: Array(board.entries.prefix(4)), slots: 4)
+                    .padding(.vertical, 3)
+            }
         }
     }
 }
 
-/// Large: every account (up to ten rows) plus the spend summary.
+/// Large: headline figures and budget, then the full table.
 struct LargeBoard: View {
     let board: WidgetBoard
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            BoardHeader(board: board, showRefresh: true)
-            if board.entries.isEmpty {
-                Text("No accounts yet")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(board.entries.prefix(10)) { entry in
-                    AccountRow(entry: entry)
-                }
-            }
-            Spacer(minLength: 0)
-            HStack(spacing: 8) {
-                if let today = board.todaySpend {
-                    Text("today \(today, format: .currency(code: "USD"))")
-                        .font(.system(size: 9))
-                }
-                if let month = board.monthSpend {
-                    Text("month \(month, format: .currency(code: "USD"))")
-                        .font(.system(size: 9))
-                }
-                if let projected = board.projectedSpend {
-                    Text("→ \(projected, format: .currency(code: "USD"))")
-                        .font(.system(size: 9))
-                }
-                Spacer()
+        VStack(spacing: 0) {
+            PanelHeader(title: "openquota", count: board.entries.count) {
                 Text(board.updatedAt, format: .dateTime.hour().minute())
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
+                    .tracking(0)
+                    .monospacedDigit()
+                RefreshButton()
             }
-            .foregroundStyle(.secondary)
+            hero
+                .padding(.horizontal, WTheme.inset)
+                .padding(.vertical, 11)
+            Rectangle().fill(WTheme.divider).frame(height: 1)
+            HStack {
+                Text("name")
+                Spacer()
+                Text("load / value")
+            }
+            .font(WTheme.mono(8, .medium))
+            .tracking(0.5)
+            .textCase(.uppercase)
+            .foregroundStyle(WTheme.inkTertiary)
+            .padding(.horizontal, WTheme.inset)
+            .padding(.top, 7)
+            .padding(.bottom, 1)
+            if board.entries.isEmpty {
+                EmptyBoard()
+            } else {
+                RowStack(entries: Array(board.entries.prefix(rowLimit)), slots: rowLimit)
+                    .padding(.bottom, 4)
+            }
+        }
+        .widgetURL(URL(string: "openquota://"))
+    }
+
+    private var rowLimit: Int { board.budgetFraction == nil ? 7 : 6 }
+
+    private var hero: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(board.heroFigure)
+                        .font(WTheme.mono(28, .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(WTheme.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                    Text(board.heroCaption)
+                        .font(WTheme.mono(9))
+                        .foregroundStyle(WTheme.inkTertiary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                VStack(alignment: .trailing, spacing: 3) {
+                    if let today = board.todaySpend {
+                        stat("today", Format.currency(today))
+                    }
+                    if let projected = board.projectedSpend {
+                        stat("→ eom", Format.currency(projected))
+                    }
+                    if board.todaySpend == nil, board.projectedSpend == nil {
+                        stat("up", "\(board.entries.count)")
+                    }
+                }
+            }
+            if let fraction = board.budgetFraction, let budget = board.budget {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("budget")
+                        Spacer()
+                        Text("\(WTheme.percent(fraction)) of \(Format.currency(budget))")
+                            .monospacedDigit()
+                            .foregroundStyle(WTheme.severity(fraction, calm: WTheme.inkSecondary))
+                    }
+                    .font(WTheme.mono(9))
+                    .foregroundStyle(WTheme.inkSecondary)
+                    Meter(fraction: fraction, height: 8, segment: 5, gap: 2)
+                }
+            }
+        }
+    }
+
+    private func stat(_ label: String, _ value: String) -> some View {
+        HStack(spacing: 5) {
+            Text(label).foregroundStyle(WTheme.inkTertiary)
+            Text(value).foregroundStyle(WTheme.ink).monospacedDigit()
+        }
+        .font(WTheme.mono(10, .medium))
+        .lineLimit(1)
+    }
+}
+
+/// Table rows sharing the available height evenly, with hairlines between
+/// them; empty slots keep the rhythm when fewer accounts are connected.
+struct RowStack: View {
+    let entries: [WidgetEntry]
+    let slots: Int
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                if index > 0 { RowDivider() }
+                TableRow(entry: entry)
+            }
+            ForEach(0..<max(slots - entries.count, 0), id: \.self) { _ in
+                Color.clear.frame(maxHeight: .infinity)
+            }
         }
     }
 }
@@ -317,62 +557,72 @@ struct InlineAccessory: View {
     let board: WidgetBoard
 
     var body: some View {
-        if let total = board.usdTotal {
-            Text("\(total, format: .currency(code: "USD")) left · \(board.entries.count) accounts")
+        if let top = board.byLoad.first, let fraction = top.fraction {
+            Text("\(top.nickname.lowercased()) \(WTheme.percent(fraction)) · \(board.entries.count) accts")
+        } else if let total = board.usdTotal {
+            Text("\(Format.currency(total)) left · \(board.entries.count) accts")
         } else {
-            Text("openquota · \(board.entries.count) accounts")
+            Text("openquota · \(board.entries.count) accts")
         }
     }
 }
 
-/// Circular: total credits left, abbreviated to fit.
+/// Circular: the most loaded account as a capacity ring, or total credit.
 struct CircularAccessory: View {
     let board: WidgetBoard
 
-    private var headline: String {
-        if let total = board.usdTotal {
-            return total >= 1000 ? String(format: "$%.0fk", total / 1000) : String(format: "$%.0f", total)
-        }
-        return "\(board.entries.count)"
-    }
-
     var body: some View {
-        ZStack {
-            AccessoryWidgetBackground()
-            Text(headline)
-                .font(.system(size: 15, weight: .bold))
-                .minimumScaleFactor(0.6)
+        if let top = board.byLoad.first, let fraction = top.fraction {
+            Gauge(value: min(max(fraction, 0), 1)) {
+                Text(top.nickname.prefix(3).uppercased())
+            } currentValueLabel: {
+                Text("\(Int((fraction * 100).rounded()))")
+                    .font(WTheme.mono(14, .semibold))
+            }
+            .gaugeStyle(.accessoryCircularCapacity)
+            .widgetAccentable()
+        } else {
+            ZStack {
+                AccessoryWidgetBackground()
+                Text(board.usdTotal.map(Format.compactCurrency) ?? "\(board.entries.count)")
+                    .font(WTheme.mono(14, .semibold))
+                    .minimumScaleFactor(0.6)
+                    .padding(4)
+            }
         }
     }
 }
 
-/// Rectangular: the first accounts' headline figures, one per line.
+/// Rectangular: the two most loaded accounts, each with a meter.
 struct RectangularAccessory: View {
     let board: WidgetBoard
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
-            ForEach(board.entries.prefix(2)) { entry in
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color(hex: entry.tintHex) ?? .accentColor)
-                        .frame(width: 5, height: 5)
-                    Text(entry.nickname)
-                        .font(.system(size: 10, weight: .semibold))
-                        .lineLimit(1)
-                    Spacer(minLength: 4)
-                    Text(entry.headlineText ?? "—")
-                        .font(.system(size: 10, weight: .bold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
+        VStack(alignment: .leading, spacing: 3) {
+            ForEach(board.byLoad.prefix(2)) { entry in
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 4) {
+                        Text(entry.nickname.lowercased())
+                            .font(WTheme.mono(11, .semibold))
+                            .lineLimit(1)
+                        Spacer(minLength: 4)
+                        Text(entry.fraction.map(WTheme.percent) ?? entry.headlineText ?? "—")
+                            .font(WTheme.mono(11, .bold))
+                            .monospacedDigit()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                    if let fraction = entry.fraction {
+                        Meter(fraction: fraction, height: 5, segment: 3, gap: 1.5)
+                    }
                 }
             }
-            if board.entries.count > 2 {
-                Text("+\(board.entries.count - 2) more")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
+            if board.entries.isEmpty {
+                Text("openquota · no accounts")
+                    .font(WTheme.mono(11))
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
 }
 
@@ -418,8 +668,6 @@ struct SelectAccountIntent: WidgetConfigurationIntent {
     var account: AccountEntity?
 }
 
-// MARK: - All-providers widget (small + medium, dense list)
-
 /// Timeline entry for the configurable per-account widget.
 struct AccountEntry: TimelineEntry {
     let date: Date
@@ -438,50 +686,27 @@ struct AccountIntentProvider: AppIntentTimelineProvider {
     }
 
     func snapshot(for configuration: SelectAccountIntent, in context: Context) async -> AccountEntry {
-        AccountEntry(date: Date(),
-                     board: WidgetStore.load() ?? WidgetStore.sample,
-                     intent: configuration)
+        AccountEntry(date: Date(), board: BoardTimeline.current.asOf(Date()), intent: configuration)
     }
 
     func timeline(for configuration: SelectAccountIntent, in context: Context) async -> Timeline<AccountEntry> {
-        let board = WidgetStore.load() ?? WidgetStore.sample
-        let next = Calendar.current.date(byAdding: .hour, value: 6, to: Date())
-            ?? Date().addingTimeInterval(21_600)
-        let entry = AccountEntry(date: Date(), board: board, intent: configuration)
-        return Timeline(entries: [entry], policy: .after(next))
+        BoardTimeline.timeline { AccountEntry(date: $0, board: $1, intent: configuration) }
     }
 }
 
-/// Timeline for the static all-providers widget: reads the same board.
-struct AccountProvider: TimelineProvider {
-    func placeholder(in context: Context) -> BoardEntry {
-        BoardEntry(date: Date(), board: WidgetStore.sample)
-    }
+// MARK: - All-providers widget
 
-    func getSnapshot(in context: Context, completion: @escaping (BoardEntry) -> Void) {
-        completion(BoardEntry(date: Date(), board: WidgetStore.load() ?? WidgetStore.sample))
-    }
-
-    func getTimeline(in context: Context, completion: @escaping (Timeline<BoardEntry>) -> Void) {
-        let board = WidgetStore.load() ?? WidgetStore.sample
-        let next = Calendar.current.date(byAdding: .hour, value: 6, to: Date())
-            ?? Date().addingTimeInterval(21_600)
-        completion(Timeline(entries: [BoardEntry(date: Date(), board: board)],
-                            policy: .after(next)))
-    }
-}
-
-/// "Providers" widget: every connected account in a compact list. The small
-/// size drops the header/spend footer so three-plus rows still fit, and the
-/// medium keeps a refresh button with room for six rows.
+/// "All Providers": every connected account as a name, a figure and a meter.
+/// Small stacks three; medium lays six out in two columns.
 struct ProvidersWidget: Widget {
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "OpenQuotaProviders", provider: AccountProvider()) { entry in
+        StaticConfiguration(kind: "OpenQuotaProviders", provider: BoardProvider()) { entry in
             ProvidersView(board: entry.board)
         }
         .configurationDisplayName("All Providers")
-        .description("Every connected account, one compact row each.")
+        .description("Every connected account with its limit meter.")
         .supportedFamilies([.systemSmall, .systemMedium])
+        .contentMarginsDisabled()
     }
 }
 
@@ -491,41 +716,50 @@ struct ProvidersView: View {
     let board: WidgetBoard
 
     var body: some View {
-        content
-            .fontDesign(.monospaced)
-            .widgetCanvas(board)
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        let rows = family == .systemSmall ? 3 : 6
-        VStack(alignment: .leading, spacing: 7) {
-            if family != .systemSmall {
-                BoardHeader(board: board, showRefresh: true)
-                Divider()
+        VStack(spacing: 0) {
+            if family == .systemSmall {
+                PanelHeader(title: "load", count: board.entries.count)
+            } else {
+                PanelHeader(title: "providers", count: board.entries.count) { RefreshButton() }
             }
             if board.entries.isEmpty {
-                Text("No accounts yet")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                EmptyBoard()
+            } else if family == .systemSmall {
+                column(Array(board.entries.prefix(3)), slots: 3)
+                    .padding(.horizontal, WTheme.inset)
             } else {
-                ForEach(board.entries.prefix(rows)) { entry in
-                    AccountRow(entry: entry)
+                let shown = Array(board.entries.prefix(6))
+                HStack(alignment: .top, spacing: 16) {
+                    column(Array(shown.prefix(3)), slots: 3)
+                    column(Array(shown.dropFirst(3)), slots: 3)
                 }
-                if board.entries.count > rows {
-                    Text("+\(board.entries.count - rows) more — open for all")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                }
+                .padding(.horizontal, WTheme.inset)
             }
-            Spacer(minLength: 0)
         }
+        .fontDesign(.monospaced)
+        .widgetCanvas()
+        .widgetURL(URL(string: "openquota://"))
+    }
+
+    private func column(_ entries: [WidgetEntry], slots: Int) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(entries) { entry in
+                StackRow(entry: entry)
+                    .frame(maxHeight: .infinity)
+            }
+            ForEach(0..<max(slots - entries.count, 0), id: \.self) { _ in
+                Color.clear.frame(maxHeight: .infinity)
+            }
+        }
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity)
     }
 }
 
+// MARK: - Single-account widget
+
 /// Per-account widget: configurable in the edit sheet, one account's
-/// headline and its limit windows. Available small (headline only),
-/// medium (headline + window bars) and as Lock Screen accessories.
+/// headline and its limit windows as meters.
 struct AccountWidget: Widget {
     var body: some WidgetConfiguration {
         AppIntentConfiguration(kind: "OpenQuotaAccount",
@@ -535,11 +769,12 @@ struct AccountWidget: Widget {
                               selected: entry.intent?.account?.id)
         }
         .configurationDisplayName("Single Account")
-        .description("One connected account you pick — headline and limits.")
+        .description("One connected account you pick — headline and limit meters.")
         .supportedFamilies([
             .systemSmall, .systemMedium,
             .accessoryInline, .accessoryCircular, .accessoryRectangular,
         ])
+        .contentMarginsDisabled()
     }
 }
 
@@ -558,257 +793,357 @@ struct AccountConfigView: View {
             if let entry {
                 switch family {
                 case .systemSmall: AccountSmall(entry: entry)
-                case .systemMedium: AccountMedium(entry: entry, board: board)
+                case .systemMedium: AccountMedium(entry: entry)
                 case .accessoryInline:
-                    Text("\(entry.headlineText ?? "—") · \(entry.nickname)")
+                    Text("\(entry.nickname.lowercased()) \(entry.fraction.map(WTheme.percent) ?? entry.headlineText ?? "—")")
                 case .accessoryCircular: AccountCircular(entry: entry)
                 default: AccountRectangular(entry: entry)
                 }
             } else {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("No account")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                    Text("Add one in Open Quota")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                }
+                EmptyBoard()
             }
         }
         .fontDesign(.monospaced)
-        .widgetCanvas(board)
+        .widgetCanvas()
     }
 }
 
-/// Severity-aware gradient limit bar shared by the per-account widgets:
-/// provider tint while healthy, the app's watch-orange from 75% and
-/// critical-red from 90%, always as a bright-to-soft gradient capsule.
-struct LimitBar: View {
-    @Environment(\.colorScheme) private var scheme
-
-    let entry: WidgetEntry
-    let fraction: Double
-    var height: CGFloat = 5
-
-    private var color: Color {
-        if fraction >= 0.90 { return scheme == .dark ? Color(hex: "F0907F")! : Color(hex: "C2412F")! }
-        if fraction >= 0.75 { return scheme == .dark ? Color(hex: "EFB25A")! : Color(hex: "B86A00")! }
-        return Color(hex: entry.tintHex) ?? .accentColor
-    }
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule().fill(color.opacity(0.18))
-                Capsule()
-                    .fill(LinearGradient(colors: [color, color.opacity(0.65)],
-                                         startPoint: .leading, endPoint: .trailing))
-                    .frame(width: max(3, geo.size.width * fraction))
-            }
-        }
-        .frame(height: height)
-    }
-}
-
-/// Small single-account: brand dot, nickname, big headline, the top limit
-/// window as a slim bar.
-struct AccountSmall: View {
-    let entry: WidgetEntry
-
-    private var tint: Color { Color(hex: entry.tintHex) ?? .accentColor }
+/// A limit window as a labelled meter: `5h window ····· 82%` over the bar,
+/// with a live reset countdown when one is known.
+struct WindowMeter: View {
+    let window: WidgetWindow
+    var height: CGFloat = 7
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 5) {
-                Circle().fill(tint).frame(width: 7, height: 7)
-                Text(entry.nickname)
-                    .font(.system(size: 10, weight: .semibold))
+            HStack(spacing: 4) {
+                Text(window.title.lowercased())
+                    .foregroundStyle(WTheme.inkSecondary)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Text(window.valueText)
+                    .fontWeight(.semibold)
+                    .monospacedDigit()
+                    .foregroundStyle(WTheme.severity(window.fraction, calm: WTheme.ink))
                     .lineLimit(1)
             }
-            .foregroundStyle(.secondary)
-            Spacer(minLength: 0)
-            Text(entry.headlineText ?? "—")
-                .font(.system(size: 24, weight: .bold))
-                .foregroundStyle(entry.headlineGradient)
-                .lineLimit(1)
-                .minimumScaleFactor(0.55)
-            Text(entry.headlineTitle ?? entry.providerName)
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-            Spacer(minLength: 0)
-            if let window = entry.windows?.first {
-                LimitBar(entry: entry, fraction: window.fraction, height: 5)
-                Text(window.title)
-                    .font(.system(size: 8))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
+            .font(WTheme.mono(9))
+            Meter(fraction: window.fraction, height: height, segment: 4, gap: 2)
         }
-        .widgetURL(URL(string: "openquota://account/\(entry.id.uuidString)"))
     }
 }
 
-/// Medium single-account: headline block on the left, up to four limit
-/// windows as labelled bars on the right.
-struct AccountMedium: View {
-    let entry: WidgetEntry
-    let board: WidgetBoard
-
-    private var tint: Color { Color(hex: entry.tintHex) ?? .accentColor }
+/// Live `↻ 1:42:10` countdown to a reset.
+struct ResetCountdown: View {
+    let date: Date
 
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 5) {
-                    Circle().fill(tint).frame(width: 7, height: 7)
-                    Text(entry.nickname)
-                        .font(.system(size: 10, weight: .semibold))
-                        .lineLimit(1)
-                }
-                .foregroundStyle(.secondary)
-                Text(entry.headlineText ?? "—")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(entry.headlineGradient)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.55)
-                Text(entry.headlineTitle ?? entry.providerName)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Spacer(minLength: 0)
+        if date > Date() {
+            HStack(spacing: 3) {
+                Text("↻")
+                Text(timerInterval: Date()...date, countsDown: true)
+                    .monospacedDigit()
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach((entry.windows ?? []).prefix(4)) { window in
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack {
-                            Text(window.title)
-                                .font(.system(size: 9, weight: .semibold))
-                                .lineLimit(1)
-                            Spacer(minLength: 4)
-                            Text(window.valueText)
-                                .font(.system(size: 9))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                        LimitBar(entry: entry, fraction: window.fraction, height: 4)
-                    }
-                }
-                Spacer(minLength: 0)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .font(WTheme.mono(8.5))
+            .foregroundStyle(WTheme.inkTertiary)
+            .lineLimit(1)
         }
-        .widgetURL(URL(string: "openquota://account/\(entry.id.uuidString)"))
     }
 }
 
-/// Circular Lock Screen accessory: the account's headline abbreviated.
+/// Small single-account: header with the provider mark, the headline figure,
+/// and the top limit window as a full-width meter.
+struct AccountSmall: View {
+    let entry: WidgetEntry
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            AccountHeader(entry: entry)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(entry.headlineText ?? "—")
+                    .font(WTheme.mono(22, .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(entry.valueColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                Text(entry.caption)
+                    .font(WTheme.mono(9))
+                    .foregroundStyle(WTheme.inkTertiary)
+                    .lineLimit(1)
+                Spacer(minLength: 6)
+                if let window = entry.windows?.first {
+                    WindowMeter(window: window, height: 9)
+                    if let reset = window.resetsAt {
+                        ResetCountdown(date: reset).padding(.top, 4)
+                    }
+                } else if let fraction = entry.fraction {
+                    Meter(fraction: fraction, height: 9, segment: 4, gap: 2)
+                } else {
+                    Text(entry.providerName.lowercased())
+                        .font(WTheme.mono(9))
+                        .foregroundStyle(WTheme.inkTertiary)
+                        .lineLimit(1)
+                }
+            }
+            .padding(.horizontal, WTheme.inset)
+            .padding(.top, 9)
+            .padding(.bottom, 13)
+        }
+        .widgetURL(entry.deepLink)
+    }
+}
+
+/// Medium single-account: headline on the left, up to three limit windows
+/// as meters on the right.
+struct AccountMedium: View {
+    let entry: WidgetEntry
+
+    var body: some View {
+        VStack(spacing: 0) {
+            AccountHeader(entry: entry, showsRefresh: true)
+            HStack(alignment: .top, spacing: 16) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(entry.headlineText ?? "—")
+                        .font(WTheme.mono(24, .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(entry.valueColor)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                    Text(entry.caption)
+                        .font(WTheme.mono(9))
+                        .foregroundStyle(WTheme.inkTertiary)
+                        .lineLimit(1)
+                    Spacer(minLength: 4)
+                    if let pace = entry.paceText {
+                        Text(pace.lowercased())
+                            .font(WTheme.mono(8.5))
+                            .foregroundStyle(WTheme.inkSecondary)
+                            .lineLimit(2)
+                    }
+                    if let reset = entry.resetsAt {
+                        ResetCountdown(date: reset)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    let windows = Array((entry.windows ?? []).prefix(3))
+                    if windows.isEmpty {
+                        if let fraction = entry.fraction {
+                            Meter(fraction: fraction, height: 9, segment: 4, gap: 2)
+                        } else {
+                            Text("no limit reported")
+                                .font(WTheme.mono(9))
+                                .foregroundStyle(WTheme.inkTertiary)
+                        }
+                        Spacer(minLength: 0)
+                    } else {
+                        ForEach(windows) { window in
+                            WindowMeter(window: window)
+                                .frame(maxHeight: .infinity, alignment: .top)
+                        }
+                        ForEach(0..<(3 - windows.count), id: \.self) { _ in
+                            Color.clear.frame(maxHeight: .infinity)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, WTheme.inset)
+            .padding(.top, 10)
+            .padding(.bottom, 12)
+        }
+        .widgetURL(entry.deepLink)
+    }
+}
+
+/// Panel header naming the account, with its provider's mark.
+struct AccountHeader: View {
+    let entry: WidgetEntry
+    var showsRefresh = false
+
+    var body: some View {
+        PanelHeader(title: entry.nickname) {
+            if showsRefresh {
+                Text(entry.providerName)
+                    .tracking(0)
+                    .textCase(.lowercase)
+                    .foregroundStyle(WTheme.inkTertiary)
+                    .lineLimit(1)
+                RefreshButton()
+            } else {
+                TintMark(hex: entry.tintHex)
+            }
+        }
+    }
+}
+
+/// Circular Lock Screen accessory: the headline load as a capacity ring.
 struct AccountCircular: View {
     let entry: WidgetEntry
 
-    private var headline: String {
-        guard let text = entry.headlineText else { return "—" }
-        if text.hasPrefix("$"), let value = Double(text.dropFirst()) {
-            return value >= 1000 ? String(format: "$%.0fk", value / 1000)
-                                 : String(format: "$%.0f", value)
-        }
-        return text
-    }
-
     var body: some View {
-        ZStack {
-            AccessoryWidgetBackground()
-            Text(headline)
-                .font(.system(size: 14, weight: .bold))
-                .minimumScaleFactor(0.6)
+        if let fraction = entry.fraction {
+            Gauge(value: min(max(fraction, 0), 1)) {
+                Text(entry.nickname.prefix(3).uppercased())
+            } currentValueLabel: {
+                Text("\(Int((fraction * 100).rounded()))")
+                    .font(WTheme.mono(14, .semibold))
+            }
+            .gaugeStyle(.accessoryCircularCapacity)
+            .widgetAccentable()
+        } else {
+            ZStack {
+                AccessoryWidgetBackground()
+                Text(entry.headlineText ?? "—")
+                    .font(WTheme.mono(13, .semibold))
+                    .minimumScaleFactor(0.5)
+                    .padding(4)
+            }
         }
     }
 }
 
-/// Rectangular Lock Screen accessory: nickname, headline and first window.
+/// Rectangular Lock Screen accessory: name and figure, the meter, and the
+/// reset countdown.
 struct AccountRectangular: View {
     let entry: WidgetEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 4) {
-                Circle()
-                    .fill(Color(hex: entry.tintHex) ?? .accentColor)
-                    .frame(width: 5, height: 5)
-                Text(entry.nickname)
-                    .font(.system(size: 10, weight: .semibold))
+                Text(entry.nickname.lowercased())
+                    .font(WTheme.mono(11, .semibold))
                     .lineLimit(1)
                 Spacer(minLength: 4)
                 Text(entry.headlineText ?? "—")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(WTheme.mono(11, .bold))
+                    .monospacedDigit()
                     .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                    .minimumScaleFactor(0.7)
             }
             if let window = entry.windows?.first {
-                HStack {
-                    Text(window.title)
-                        .font(.system(size: 9))
-                        .lineLimit(1)
+                Meter(fraction: window.fraction, height: 6, segment: 3, gap: 1.5)
+                HStack(spacing: 4) {
+                    Text(window.title.lowercased()).lineLimit(1)
                     Spacer(minLength: 4)
-                    Text(window.valueText)
-                        .font(.system(size: 9, weight: .semibold))
-                        .lineLimit(1)
+                    Text(WTheme.percent(window.fraction)).monospacedDigit()
                 }
-                .foregroundStyle(.secondary)
+                .font(WTheme.mono(9))
+            } else if let fraction = entry.fraction {
+                Meter(fraction: fraction, height: 6, segment: 3, gap: 1.5)
+            } else {
+                Text(entry.caption).font(WTheme.mono(9)).lineLimit(1)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
 }
 
-// MARK: - Widget design system
-// Mirrors the app: graphite canvas surfaces, and the only colour comes from
-// the connected providers' own tints — as a soft wash behind the board and a
-// gradient on headline figures.
-
-extension WidgetBoard {
-    /// Gradient of the connected providers' tints for big headline figures.
-    var headlineGradient: LinearGradient {
-        let tints = entries.compactMap { Color(hex: $0.tintHex) }
-        let colors: [Color] = tints.isEmpty ? [Color.primary] : Array(tints.prefix(4))
-        return LinearGradient(colors: colors,
-                              startPoint: .topLeading, endPoint: .bottomTrailing)
-    }
-}
+// MARK: - Canvas
 
 extension View {
-    /// The widget canvas: the app's calm graphite surface with a soft
-    /// gradient wash of the providers' tints in the corner.
-    func widgetCanvas(_ board: WidgetBoard) -> some View {
-        containerBackground(for: .widget) {
-            Color(uiColor: .secondarySystemBackground)
-                .overlay(
-                    LinearGradient(colors: washColors(board),
-                                   startPoint: .topLeading, endPoint: .bottomTrailing)
-                        .allowsHitTesting(false))
-        }
-    }
-
-    private func washColors(_ board: WidgetBoard) -> [Color] {
-        let tints = board.entries.compactMap { Color(hex: $0.tintHex) }
-        guard !tints.isEmpty else { return [.clear] }
-        var colors = tints.prefix(3).enumerated().map { index, tint in
-            tint.opacity(0.16 - Double(index) * 0.04)
-        }
-        colors.append(.clear)
-        return colors
+    /// The widget canvas: the app's plain card surface — no tint wash.
+    func widgetCanvas() -> some View {
+        containerBackground(for: .widget) { WTheme.surface }
     }
 }
 
-// MARK: - Helpers
+// MARK: - Model helpers
+
+extension WidgetBoard {
+    /// The board as it stands at `date`: any window whose reset has passed
+    /// reads as freshly reset rather than showing its old load.
+    func asOf(_ date: Date) -> WidgetBoard {
+        var copy = self
+        copy.entries = entries.map { $0.asOf(date) }
+        return copy
+    }
+
+    /// Accounts with a limit first, most loaded first; the rest keep their order.
+    var byLoad: [WidgetEntry] {
+        let limited = entries.filter { $0.fraction != nil }
+            .sorted { ($0.fraction ?? 0) > ($1.fraction ?? 0) }
+        return limited + entries.filter { $0.fraction == nil }
+    }
+
+    var heroTitle: String {
+        if usdTotal != nil { return "credit" }
+        if monthSpend != nil { return "spend · mtd" }
+        return "openquota"
+    }
+
+    var heroFigure: String {
+        if let usdTotal { return Format.currency(usdTotal) }
+        if let monthSpend { return Format.currency(monthSpend) }
+        if let top = byLoad.first { return top.headlineText ?? "—" }
+        return "—"
+    }
+
+    var heroCaption: String {
+        if usdTotal != nil {
+            if let monthSpend { return "prepaid left · \(Format.currency(monthSpend)) mtd" }
+            return "prepaid left"
+        }
+        if monthSpend != nil { return "spent this month" }
+        return byLoad.first.map { $0.nickname.lowercased() } ?? "no data yet"
+    }
+
+    /// One-clause caption for the narrow small widget.
+    var shortCaption: String {
+        if usdTotal != nil { return "prepaid left" }
+        if monthSpend != nil { return "spent this month" }
+        return byLoad.first.map { $0.nickname.lowercased() } ?? "no data yet"
+    }
+
+    var budgetFraction: Double? {
+        guard let budget, budget > 0, let monthSpend else { return nil }
+        return monthSpend / budget
+    }
+}
 
 extension WidgetEntry {
-    /// The account's own tint as a headline gradient — bright tint fading
-    /// slightly toward the trailing edge.
-    var headlineGradient: LinearGradient {
-        let tint = Color(hex: tintHex) ?? Color.accentColor
-        return LinearGradient(colors: [tint, tint.opacity(0.72)],
-                              startPoint: .topLeading, endPoint: .bottomTrailing)
+    func asOf(_ date: Date) -> WidgetEntry {
+        var copy = self
+        if let reset = resetsAt, reset <= date, fraction != nil {
+            copy.fraction = 0
+            copy.headlineText = "reset"
+            copy.resetsAt = nil
+        }
+        copy.windows = windows?.map { window in
+            guard let reset = window.resetsAt, reset <= date else { return window }
+            var fresh = window
+            fresh.fraction = 0
+            fresh.valueText = "reset"
+            fresh.resetsAt = nil
+            return fresh
+        }
+        return copy
+    }
+
+    var deepLink: URL {
+        URL(string: "openquota://account/\(id.uuidString)")!
+    }
+
+    /// Ink while healthy, amber/red once the headline allowance is at stake.
+    var valueColor: Color {
+        fraction.map { WTheme.severity($0, calm: WTheme.ink) } ?? WTheme.ink
+    }
+
+    /// `credits left · openrouter` — what the headline figure means.
+    var caption: String {
+        let title = (headlineTitle ?? "").lowercased()
+        let provider = providerName.lowercased()
+        if title.isEmpty { return provider }
+        if provider == nickname.lowercased() { return title }
+        return "\(title) · \(provider)"
+    }
+}
+
+extension Format {
+    /// `$1.2k`-style figure for the tiny circular accessory.
+    static func compactCurrency(_ amount: Double) -> String {
+        amount >= 1000 ? String(format: "$%.1fk", amount / 1000) : String(format: "$%.0f", amount)
     }
 }
 

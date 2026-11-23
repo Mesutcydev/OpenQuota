@@ -2,10 +2,10 @@ import SwiftUI
 
 // MARK: - Ambient lights
 
-/// Soft coloured lights drifting behind the Overview. Their colour follows
-/// the board's mood — cool and quiet while everything is calm, warming to
-/// amber or coral when something needs a look — so the backdrop doubles as
-/// a status cue without adding any chrome.
+/// Soft monochrome light drifting behind the Overview — pale haze on
+/// graphite, faint shade on porcelain. No hue: colour in this app is kept for
+/// warnings, so the backdrop only adds depth. A board that needs a look
+/// brightens the haze slightly instead of tinting it.
 ///
 /// Drawn with radial gradients rather than blurs (cheap to redraw), capped at
 /// 30 fps, frozen under Reduce Motion, and dimmed in pure-black mode so the
@@ -31,11 +31,8 @@ struct AmbientLights: View {
     }
 
     private var palette: [Color] {
-        switch mood {
-        case .calm: return [Color(hex: "5B7CFA"), Color(hex: "9B6BF2"), Color(hex: "2FB5A3")]
-        case .watch: return [Theme.watch, Color(hex: "E8875B"), Color(hex: "9B6BF2")]
-        case .critical: return [Theme.critical, Theme.watch, Color(hex: "C2417A")]
-        }
+        let light = scheme == .dark ? Color.white : Color(hex: "15171A")
+        return [light, light, light]
     }
 
     private var lights: [Light] {
@@ -51,8 +48,12 @@ struct AmbientLights: View {
     }
 
     private var strength: Double {
-        if scheme == .light { return 0.13 }
-        return oled ? 0.11 : 0.20
+        let base: Double = scheme == .light ? 0.045 : (oled ? 0.035 : 0.06)
+        switch mood {
+        case .calm: return base
+        case .watch: return base * 1.2
+        case .critical: return base * 1.4
+        }
     }
 
     var body: some View {

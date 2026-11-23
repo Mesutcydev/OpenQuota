@@ -39,15 +39,15 @@ struct AccountDetailView: View {
                 if let message = state.errorMessage {
                     VStack(alignment: .leading, spacing: Theme.Space.s) {
                         Callout(text: message, level: .critical)
-                        HStack {
+                        HStack(spacing: Theme.Space.s) {
                             Button("Try again") { Task { await model.refresh(account) } }
-                                .buttonStyle(.glass)
+                                .buttonStyle(SecondaryButtonStyle(compact: true))
                             if descriptor.webSignIn != nil {
                                 Button("Sign in again") { replacingKey = true }
-                                    .buttonStyle(.glass)
+                                    .buttonStyle(SecondaryButtonStyle(compact: true))
                             } else if message.lowercased().contains("key") {
                                 Button("Replace key") { replacingKey = true }
-                                    .buttonStyle(.glass)
+                                    .buttonStyle(SecondaryButtonStyle(compact: true))
                             }
                         }
                     }
@@ -551,6 +551,9 @@ struct ReplaceKeyView: View {
                 }
             }
             .interactiveDismissDisabled(isSaving)
+            .task {
+                if let kind = descriptor.webSignIn { WebSignInPrewarmer.shared.prewarm(kind) }
+            }
             .sheet(isPresented: $signingIn) {
                 if let kind = descriptor.webSignIn {
                     WebSignInView(kind: kind) { credential in

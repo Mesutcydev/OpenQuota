@@ -40,7 +40,7 @@ struct SettingsView: View {
                                       + "refresh. With background refresh on, iOS also re-reads them every so "
                                       + "often while the app is closed, so widgets and alerts stay current.") {
                         SettingsRow(symbol: "arrow.clockwise", color: .blue, title: "Refresh on launch") {
-                            Toggle("", isOn: $model.settings.refreshOnLaunch).labelsHidden().tint(Theme.brand)
+                            Toggle("", isOn: $model.settings.refreshOnLaunch).labelsHidden().tint(Theme.toggleOn)
                         }
                         SettingsRow(symbol: "clock.arrow.circlepath", color: .teal, title: "Refresh after") {
                             Menu {
@@ -56,7 +56,7 @@ struct SettingsView: View {
                         }
                         SettingsRow(symbol: "arrow.trianglehead.2.clockwise.rotate.90", color: .cyan,
                                     title: "Refresh in background", showsDivider: false) {
-                            Toggle("", isOn: $model.settings.backgroundRefresh).labelsHidden().tint(Theme.brand)
+                            Toggle("", isOn: $model.settings.backgroundRefresh).labelsHidden().tint(Theme.toggleOn)
                         }
                         .onChange(of: model.settings.backgroundRefresh) { _, enabled in
                             BackgroundRefresh.schedule(enabled: enabled)
@@ -74,7 +74,7 @@ struct SettingsView: View {
                                     model.settings.alertsEnabled = enabled
                                     if enabled { Task { _ = await model.requestAlertPermission() } }
                                 }))
-                                .labelsHidden().tint(Theme.brand)
+                                .labelsHidden().tint(Theme.toggleOn)
                         }
                         if model.settings.alertsEnabled {
                             thresholdSlider
@@ -97,7 +97,7 @@ struct SettingsView: View {
                                         model.cancelResetAlerts()
                                     }
                                 }))
-                                .labelsHidden().tint(Theme.brand)
+                                .labelsHidden().tint(Theme.toggleOn)
                         }
                     }
 
@@ -113,10 +113,10 @@ struct SettingsView: View {
                         }
                         .buttonStyle(.plain)
                         SettingsRow(symbol: "chart.bar.xaxis", color: .orange, title: "Budget alerts") {
-                            Toggle("", isOn: alertToggle(\.budgetAlertsEnabled)).labelsHidden().tint(Theme.brand)
+                            Toggle("", isOn: alertToggle(\.budgetAlertsEnabled)).labelsHidden().tint(Theme.toggleOn)
                         }
                         SettingsRow(symbol: "waveform.path.ecg", color: Color(hex: "C2412F"), title: "Spike alerts") {
-                            Toggle("", isOn: alertToggle(\.spikeAlertsEnabled)).labelsHidden().tint(Theme.brand)
+                            Toggle("", isOn: alertToggle(\.spikeAlertsEnabled)).labelsHidden().tint(Theme.toggleOn)
                         }
                         Button { showingRecap = true } label: {
                             SettingsRow(symbol: "calendar", color: Color(hex: "5E6472"),
@@ -135,7 +135,7 @@ struct SettingsView: View {
                                       footer: "Locks the app whenever it goes to the background. Widgets still show figures.") {
                             SettingsRow(symbol: "faceid", color: .green, title: "Require \(AppLock.biometryName)",
                                         showsDivider: false) {
-                                Toggle("", isOn: $model.settings.requireUnlock).labelsHidden().tint(Theme.brand)
+                                Toggle("", isOn: $model.settings.requireUnlock).labelsHidden().tint(Theme.toggleOn)
                             }
                         }
                     }
@@ -154,7 +154,7 @@ struct SettingsView: View {
                         SettingsRow(symbol: "moon.stars.fill", color: .black,
                                     title: "Pure black (OLED)") {
                             Toggle("", isOn: $model.settings.oledBlack.animation(.snappy))
-                                .labelsHidden().tint(Theme.brand)
+                                .labelsHidden().tint(Theme.toggleOn)
                         }
                         SettingsRow(symbol: "arrow.up.arrow.down", color: Color(hex: "5E6472"),
                                     title: "Overview order") {

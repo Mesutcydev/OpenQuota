@@ -358,7 +358,6 @@ struct BudgetEditor: View {
                         .focused($focused)
                 }
                 .font(.mono(size: Theme.TypeScale.display, weight: .semibold))
-                .padding(Theme.Space.l)
                 .card()
                 Text("# alerts at 80% and when spent. the projection assumes the rest of the month runs at the pace so far.")
                     .font(.mono(.caption))
@@ -366,8 +365,7 @@ struct BudgetEditor: View {
                 HStack(spacing: Theme.Space.s) {
                     ForEach([50.0, 200, 500, 1000], id: \.self) { preset in
                         Button("$\(Int(preset))") { text = "\(Int(preset))" }
-                            .buttonStyle(.glass)
-                            .font(.mono(.caption, weight: .medium))
+                            .buttonStyle(SecondaryButtonStyle(compact: true))
                     }
                 }
                 Spacer()
@@ -502,7 +500,7 @@ struct RecapSheet: View {
                         .elevated()
                     Toggle("Hide amounts", isOn: $hideAmounts)
                         .font(.mono(.subheadline))
-                        .tint(Theme.brand)
+                        .tint(Theme.toggleOn)
                         .padding(.horizontal, Theme.Space.l)
                         .padding(.vertical, Theme.Space.m)
                         .card(padding: 0)

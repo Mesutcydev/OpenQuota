@@ -328,3 +328,47 @@ enum MetricText {
         return summary
     }
 }
+
+// MARK: - Buttons
+
+/// The one primary action on a screen: a solid accent slab, card-radius
+/// corners, monospaced label. 50 pt tall so it lines up with form rows.
+struct PrimaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.mono(.callout, weight: .semibold))
+            .foregroundStyle(Theme.onAccent)
+            .frame(maxWidth: .infinity, minHeight: 50)
+            .padding(.horizontal, Theme.Space.l)
+            .background(Theme.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.control + 4,
+                                                           style: .continuous))
+            .opacity(isEnabled ? (configuration.isPressed ? 0.82 : 1) : 0.38)
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .animation(.press, value: configuration.isPressed)
+            .contentShape(Rectangle())
+    }
+}
+
+/// Secondary action: a raised surface with a hairline, ink label.
+struct SecondaryButtonStyle: ButtonStyle {
+    var compact = false
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: compact ? Theme.Radius.control : Theme.Radius.control + 4,
+                                     style: .continuous)
+        configuration.label
+            .font(.mono(compact ? .caption : .callout, weight: .semibold))
+            .foregroundStyle(Theme.ink)
+            .frame(maxWidth: compact ? nil : .infinity, minHeight: compact ? 32 : 50)
+            .padding(.horizontal, compact ? Theme.Space.m : Theme.Space.l)
+            .background(Theme.surfaceRaised.opacity(configuration.isPressed ? 0.7 : 1), in: shape)
+            .overlay { shape.strokeBorder(Theme.hairline, lineWidth: 1) }
+            .opacity(isEnabled ? 1 : 0.4)
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .animation(.press, value: configuration.isPressed)
+            .contentShape(Rectangle())
+    }
+}

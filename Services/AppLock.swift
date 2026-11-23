@@ -64,7 +64,8 @@ struct LockCover: View {
                 Text("Open Quota is locked")
                     .font(.headline)
                 Button("Unlock with \(AppLock.biometryName)", action: unlock)
-                    .buttonStyle(.glassProminent)
+                    .buttonStyle(PrimaryButtonStyle())
+                    .frame(maxWidth: 280)
             }
         }
     }

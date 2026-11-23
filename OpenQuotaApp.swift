@@ -12,7 +12,7 @@ struct OpenQuotaApp: App {
             RootView()
                 .environment(model)
                 .environment(router)
-                .tint(Theme.buttonTint)
+                .tint(Theme.accent)
                 .preferredColorScheme(model.settings.appearance.colorScheme)
                 .environment(\.oledBlack, model.settings.oledBlack)
                 .onAppear { appDelegate.router = router }

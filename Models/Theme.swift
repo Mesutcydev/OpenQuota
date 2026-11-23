@@ -15,11 +15,16 @@ enum Theme {
     static let brand = adaptive(light: "15171A", dark: "ECECEE")
     /// Secondary neutral accent.
     static let brandDeep = adaptive(light: "5F6670", dark: "A3A3A8")
-    /// Tint for filled controls — prominent buttons, toggles, highlights.
-    /// The near-white `brand` fills made buttons glare in dark mode ("buttons
-    /// can't be read, too bright"); a mid-graphite keeps the monochrome look
-    /// while light text stays readable. Light mode uses brand (graphite) as is.
-    static let buttonTint = adaptive(light: "15171A", dark: "6E7079")
+    /// Control colour — text buttons, links, selection, filled primary
+    /// buttons. Graphite on porcelain; a soft off-white on graphite, paired
+    /// with dark label text (`onAccent`) so filled buttons stay readable.
+    /// (1.1.1's mid-grey tint made every control look disabled.)
+    static let accent = adaptive(light: "15171A", dark: "E4E4E7")
+    /// Label colour on an `accent` fill.
+    static let onAccent = adaptive(light: "FFFFFF", dark: "111113")
+    /// "On" state of switches, kept monochrome: graphite on light, a mid
+    /// grey on dark — a near-white track under the white knob read as off.
+    static let toggleOn = adaptive(light: "15171A", dark: "85868D")
 
     // MARK: Surfaces
 
