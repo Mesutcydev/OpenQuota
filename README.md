@@ -39,10 +39,11 @@ implying otherwise.
 ## Install (sideload)
 
 Grab the unsigned IPA from the
-[releases page](https://github.com/Mesutcydev/OpenQuota/releases) and re-sign
-it with your own Apple ID using Sideloadly or AltStore — step-by-step
-instructions in [SIDELOAD.md](SIDELOAD.md). A free Apple ID works; the
-signature then needs refreshing every 7 days.
+[releases page](https://github.com/Mesutcydev/OpenQuota/releases) and sign it
+with your own Apple ID using **AltStore** (or a similar tool — SideStore,
+Sideloadly, eSign…). Step-by-step instructions in
+[SIDELOAD.md](SIDELOAD.md). A free Apple ID works; AltStore re-signs
+automatically every 7 days.
 
 ## Build from source
 

@@ -1,25 +1,33 @@
 # Installing OpenQuota.ipa on your iPhone
 
 The release IPA (`OpenQuota-unsigned.ipa`) is **unsigned**. It cannot be
-installed as-is — iOS refuses any app without a valid signature. You re-sign
-it with your own Apple ID, which is what every sideloading tool does for you.
+installed as-is — iOS refuses any app without a valid signature. Sign it with
+**your own Apple ID** using AltStore or a similar sideloading tool. A free
+Apple ID works.
 
-## Option A — Sideloadly (simplest)
+## Option A — AltStore (recommended)
 
-1. Install [Sideloadly](https://sideloadly.io) on your Mac or Windows PC.
+1. Install [AltServer](https://altstore.io) on your Mac or Windows PC
+   (AltStore is installed onto the phone from AltServer).
 2. Download `OpenQuota-unsigned.ipa` from the
    [releases page](https://github.com/Mesutcydev/OpenQuota/releases).
-3. Plug in the iPhone, drag the IPA into Sideloadly, enter your Apple ID,
-   click Start.
-4. On the phone: **Settings → General → VPN & Device Management** → trust your
-   developer certificate.
-5. Launch Open Quota.
+3. On the phone, open AltStore → **My Apps** → tap **+** → pick the IPA.
+   Sign in with your Apple ID when asked.
+4. AltStore signs Open Quota with your certificate and installs it. Enable
+   Background Refresh so AltStore can **re-sign automatically every 7 days** —
+   otherwise the free certificate expires.
 
-## Option B — AltStore (self-refreshing)
+Similar tools that work the same way: [SideStore](https://sidestore.io)
+(installs and refreshes without a computer), Scarlet, eSign, and most
+on-device signers. Any of them can sign this IPA.
 
-Install [AltServer](https://altstore.io) on your computer and AltStore on the
-phone, then **My Apps → + → OpenQuota-unsigned.ipa**. AltStore refreshes the
-signature in the background so the app keeps working.
+## Option B — Sideloadly
+
+If you prefer a one-shot install: install
+[Sideloadly](https://sideloadly.io), plug in the iPhone, drag the IPA in,
+enter your Apple ID, Start. Then trust the certificate under
+**Settings → General → VPN & Device Management**. Note that Sideloadly does
+not auto-refresh — re-sign manually every 7 days on a free account.
 
 ## Option C — Build it yourself (no IPA needed)
 
@@ -37,7 +45,8 @@ open OpenQuota.xcodeproj
 
 ## Free Apple ID limits
 
-- The app stops working after **7 days** and needs re-signing.
+- The signature lasts **7 days** — AltStore re-signs automatically if it can
+  reach AltServer (or SideStore refreshes on-device).
 - Maximum 3 sideloaded apps per device.
 - A paid Apple Developer account ($99/yr) raises this to a year.
 
