@@ -1,0 +1,45 @@
+name: OpenQuota
+options:
+  bundleIdPrefix: ai.openquota
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    SWIFT_STRICT_CONCURRENCY: minimal
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+
+targets:
+  OpenQuota:
+    type: application
+    platform: iOS
+    sources:
+      - path: Models
+      - path: Providers
+      - path: Services
+      - path: Shared
+      - path: Views
+      - path: Assets.xcassets
+      - path: OpenQuotaApp.swift
+      - path: WidgetData.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.openquota.app
+        INFOPLIST_FILE: Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: OpenQuota.entitlements
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+
+schemes:
+  OpenQuota:
+    build:
+      targets:
+        OpenQuota: release
+    run:
+      config: Debug
