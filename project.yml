@@ -18,6 +18,9 @@ targets:
   OpenQuota:
     type: application
     platform: iOS
+    dependencies:
+      - target: OpenQuotaWidgets
+        embed: true
     sources:
       - path: Models
       - path: Providers
@@ -35,6 +38,23 @@ targets:
         CODE_SIGN_ENTITLEMENTS: OpenQuota.entitlements
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+
+  OpenQuotaWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Widgets
+      - path: WidgetData.swift
+      - path: Models/UsageModels.swift
+      - path: Models/Formatting.swift
+      - path: Shared/SharedIntents.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.openquota.app.widgets
+        INFOPLIST_FILE: Widgets/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: Widgets/Widgets.entitlements
+        TARGETED_DEVICE_FAMILY: "1"
 
 schemes:
   OpenQuota:

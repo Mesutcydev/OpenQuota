@@ -15,8 +15,11 @@
 		1349006FD53A084BF34BAF17 /* AddAccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F77C4B99B28F5566802EBFAD /* AddAccountView.swift */; };
 		1F2BC42B8E6CB89A7661F0BF /* AnthropicProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95356D6BCCCE83582BB9A74D /* AnthropicProvider.swift */; };
 		24F3D8E87664B3711759B7ED /* OpenRouterProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18AFA6C30F30D723359062D6 /* OpenRouterProvider.swift */; };
+		25478C215FF3A1CEC5CAF094 /* UsageModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9395757337A36E26A95E98FC /* UsageModels.swift */; };
 		2C30AC70C3632BB9AA3BC9C6 /* AccountDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80EB7C70EDD0E468CFE22955 /* AccountDetailView.swift */; };
 		2E3FC36B33B61A223242E827 /* AIMLProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B1E1F09A5AE10B1D4C008D6 /* AIMLProvider.swift */; };
+		3163ACD222A9AC64BDFE057B /* OpenQuotaWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = DAB9BD9E1469F4AE39A610C8 /* OpenQuotaWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		3DE6BC834B18272085DFDE1E /* Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55A40284CD240FD7B683FA2C /* Formatting.swift */; };
 		406522F166AD48356240C36A /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4E46B7E00A9717BB7D1FCFD /* AppModel.swift */; };
 		44D0D60D004435704EB5E6BD /* WidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88405C6FC5120BDC73A7EC62 /* WidgetData.swift */; };
 		4774094A32B1C7687E7FBA1D /* ElevenLabsProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1437640D2C808A939A6BE51E /* ElevenLabsProvider.swift */; };
@@ -29,6 +32,7 @@
 		707D4927EC20C0E0FEC315FE /* UsageProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B224ADB54BC8869BE47C8D69 /* UsageProvider.swift */; };
 		70A540061DD28933043E1C03 /* LiveActivities.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE27CB212C8C3FC0F0ED2AC7 /* LiveActivities.swift */; };
 		77DA1D4CC9D82F28ABE16E79 /* BackgroundRefresh.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4697CA9117DF97DE1D89DB06 /* BackgroundRefresh.swift */; };
+		78EF4B59259CBDD042859274 /* SharedIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE30429A45CED3C9936A3A42 /* SharedIntents.swift */; };
 		7C61A905E6716D40468653E5 /* AppLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 168C0298CDE713DB1B69B65B /* AppLock.swift */; };
 		871CBABB8FE258503A2218E2 /* DeepSeekProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CD70A17177BAA33D169140D /* DeepSeekProvider.swift */; };
 		895C666DFFAFBB66286534C9 /* Pace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D912B616319CABB164E8F3D /* Pace.swift */; };
@@ -37,6 +41,7 @@
 		902B871B0954C80130FAB4D2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E9B8F771FE21528BF87189B3 /* Assets.xcassets */; };
 		956404E903DE42001940F4B6 /* Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55A40284CD240FD7B683FA2C /* Formatting.swift */; };
 		9572EC6B3449473F9D85F043 /* AccountsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 168F97CA86B546C8A892E549 /* AccountsView.swift */; };
+		975E83130C6A14669FC6F668 /* WidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88405C6FC5120BDC73A7EC62 /* WidgetData.swift */; };
 		997B99C467E79F9747641450 /* DemoData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36FFF2239DF91FCB71057055 /* DemoData.swift */; };
 		99B899B1F83EB7D246A88FFD /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21FF8B33B3C8029E4F59F438 /* KeychainStore.swift */; };
 		9ADAE0C467700E27E69FACC9 /* Ambient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E45CB1748B627274A8DE2D6A /* Ambient.swift */; };
@@ -47,6 +52,7 @@
 		A6CE89142D57F6540A2B3A47 /* MistralProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21507B27FCD085501BE641B4 /* MistralProvider.swift */; };
 		AF48CD85ABC3F3B8E97AC5D0 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4AFB3AC8E23CF148B4FACE9 /* SettingsView.swift */; };
 		B490D2139A0FB122D3E9BBF7 /* MiniMaxProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66A8FA9F74DBDEF41981F692 /* MiniMaxProvider.swift */; };
+		B4BE1A13368642B93535E891 /* Widgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7CD4444B86B5457EF2CD24E /* Widgets.swift */; };
 		B79AD4260CB96CC7367F49B7 /* TogetherProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5025E15749AFD256EA99AF63 /* TogetherProvider.swift */; };
 		B7C8132F3D0F359DF29E824F /* XAIProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = F06C864D95D24BB31FB2D791 /* XAIProvider.swift */; };
 		B7E3B1ADA867A6242EBCFF35 /* OpenCodeProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9906E36812E31BAA1C85D4FB /* OpenCodeProvider.swift */; };
@@ -68,6 +74,30 @@
 		FB1F65A997C0A03D985CD3D1 /* UsageModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9395757337A36E26A95E98FC /* UsageModels.swift */; };
 		FCCDB931D15F4291F4C6E8D0 /* UsageIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22E006C75274D8DB09D16DA1 /* UsageIntents.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		769A1105B077052A4FC28B2E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2BE9A41103B49A9417CF6D0D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 9503E14D322FC6310636A315;
+			remoteInfo = OpenQuotaWidgets;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D879726D6942529F9C41EA6B /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				3163ACD222A9AC64BDFE057B /* OpenQuotaWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		0162A07D990E7B5FA936007C /* WebSignIn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebSignIn.swift; sourceTree = "<group>"; };
@@ -91,6 +121,7 @@
 		5025E15749AFD256EA99AF63 /* TogetherProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TogetherProvider.swift; sourceTree = "<group>"; };
 		541096727FB0101D2E931A98 /* DeepInfraProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepInfraProvider.swift; sourceTree = "<group>"; };
 		55A40284CD240FD7B683FA2C /* Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatting.swift; sourceTree = "<group>"; };
+		5685439C3C5116AD9A7CB571 /* Widgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Widgets.entitlements; sourceTree = "<group>"; };
 		58C0AF43FB884E0AF9DEA155 /* NovitaProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NovitaProvider.swift; sourceTree = "<group>"; };
 		5B1E1F09A5AE10B1D4C008D6 /* AIMLProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIMLProvider.swift; sourceTree = "<group>"; };
 		5BDAA7F136BDA99E5D251A46 /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Persistence.swift; sourceTree = "<group>"; };
@@ -118,15 +149,18 @@
 		AF4B566C02E8745054546896 /* SiliconFlowProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiliconFlowProvider.swift; sourceTree = "<group>"; };
 		AF5C9A0139B1421ACAFED04B /* ClaudeSubscriptionProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeSubscriptionProvider.swift; sourceTree = "<group>"; };
 		B224ADB54BC8869BE47C8D69 /* UsageProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageProvider.swift; sourceTree = "<group>"; };
+		B7CD4444B86B5457EF2CD24E /* Widgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Widgets.swift; sourceTree = "<group>"; };
 		BEBFE34B6EAE6ADF6424BABE /* Motion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Motion.swift; sourceTree = "<group>"; };
 		C4E46B7E00A9717BB7D1FCFD /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		C8778E0D9735AADD26A03E54 /* RunwayProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunwayProvider.swift; sourceTree = "<group>"; };
 		D2796CD79BC4604D3FD13363 /* ChatGPTSubscriptionProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGPTSubscriptionProvider.swift; sourceTree = "<group>"; };
+		DAB9BD9E1469F4AE39A610C8 /* OpenQuotaWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = OpenQuotaWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		E45CB1748B627274A8DE2D6A /* Ambient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ambient.swift; sourceTree = "<group>"; };
 		E4A58D2113058DFC5E34DDC9 /* CopilotProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopilotProvider.swift; sourceTree = "<group>"; };
 		E9B8F771FE21528BF87189B3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F06C864D95D24BB31FB2D791 /* XAIProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XAIProvider.swift; sourceTree = "<group>"; };
 		F4AFB3AC8E23CF148B4FACE9 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		F6BF8CA2E6D0A936606BDE8C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		F77C4B99B28F5566802EBFAD /* AddAccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddAccountView.swift; sourceTree = "<group>"; };
 		FC53DD50459C2934DB62FB11 /* DeepgramProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepgramProvider.swift; sourceTree = "<group>"; };
 		FD873B531E9E17265C410654 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -211,6 +245,16 @@
 			path = Onboarding;
 			sourceTree = "<group>";
 		};
+		6F10CC4C98B2CFB5DD879851 /* Widgets */ = {
+			isa = PBXGroup;
+			children = (
+				F6BF8CA2E6D0A936606BDE8C /* Info.plist */,
+				5685439C3C5116AD9A7CB571 /* Widgets.entitlements */,
+				B7CD4444B86B5457EF2CD24E /* Widgets.swift */,
+			);
+			path = Widgets;
+			sourceTree = "<group>";
+		};
 		728651351AE56D903B7E0223 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
@@ -240,6 +284,7 @@
 				4678402D573317FC7EF27BF6 /* Services */,
 				728651351AE56D903B7E0223 /* Shared */,
 				159D67E0970FA7FB187994E3 /* Views */,
+				6F10CC4C98B2CFB5DD879851 /* Widgets */,
 				AE3DF70E1C007BDAF9B9324C /* Products */,
 			);
 			sourceTree = "<group>";
@@ -248,6 +293,7 @@
 			isa = PBXGroup;
 			children = (
 				0AAA0108485A3536B39F06E3 /* OpenQuota.app */,
+				DAB9BD9E1469F4AE39A610C8 /* OpenQuotaWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -274,10 +320,12 @@
 			buildPhases = (
 				501D9328D8F1A089F0085F08 /* Sources */,
 				A5A99F412957675795394ADC /* Resources */,
+				D879726D6942529F9C41EA6B /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				30C04A923D95B109B0064664 /* PBXTargetDependency */,
 			);
 			name = OpenQuota;
 			packageProductDependencies = (
@@ -285,6 +333,23 @@
 			productName = OpenQuota;
 			productReference = 0AAA0108485A3536B39F06E3 /* OpenQuota.app */;
 			productType = "com.apple.product-type.application";
+		};
+		9503E14D322FC6310636A315 /* OpenQuotaWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7BA30AF1EA32E705F3C3526A /* Build configuration list for PBXNativeTarget "OpenQuotaWidgets" */;
+			buildPhases = (
+				00A4D08C378CD0BC96A9DA6A /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = OpenQuotaWidgets;
+			packageProductDependencies = (
+			);
+			productName = OpenQuotaWidgets;
+			productReference = DAB9BD9E1469F4AE39A610C8 /* OpenQuotaWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -296,6 +361,9 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					5AB1F6678BFAB3082AC902FB = {
+						ProvisioningStyle = Automatic;
+					};
+					9503E14D322FC6310636A315 = {
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -315,6 +383,7 @@
 			projectRoot = "";
 			targets = (
 				5AB1F6678BFAB3082AC902FB /* OpenQuota */,
+				9503E14D322FC6310636A315 /* OpenQuotaWidgets */,
 			);
 		};
 /* End PBXProject section */
@@ -331,6 +400,18 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		00A4D08C378CD0BC96A9DA6A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3DE6BC834B18272085DFDE1E /* Formatting.swift in Sources */,
+				78EF4B59259CBDD042859274 /* SharedIntents.swift in Sources */,
+				25478C215FF3A1CEC5CAF094 /* UsageModels.swift in Sources */,
+				975E83130C6A14669FC6F668 /* WidgetData.swift in Sources */,
+				B4BE1A13368642B93535E891 /* Widgets.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		501D9328D8F1A089F0085F08 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -398,6 +479,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		30C04A923D95B109B0064664 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 9503E14D322FC6310636A315 /* OpenQuotaWidgets */;
+			targetProxy = 769A1105B077052A4FC28B2E /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		0E9F5F716847A8276FA7FD80 /* Debug */ = {
@@ -467,6 +556,23 @@
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
+		};
+		379669BCC4E42BA830DD044B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Widgets/Widgets.entitlements;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = ai.openquota.app.widgets;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
 		};
 		5E7E1715462322A75C55A691 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -547,6 +653,23 @@
 			};
 			name = Debug;
 		};
+		A6B2847828A88BEF88DAEF76 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Widgets/Widgets.entitlements;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Widgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = ai.openquota.app.widgets;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
 		D13E54C38A12A1573B41F53C /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -573,6 +696,15 @@
 			buildConfigurations = (
 				0E9F5F716847A8276FA7FD80 /* Debug */,
 				5E7E1715462322A75C55A691 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		7BA30AF1EA32E705F3C3526A /* Build configuration list for PBXNativeTarget "OpenQuotaWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A6B2847828A88BEF88DAEF76 /* Debug */,
+				379669BCC4E42BA830DD044B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
