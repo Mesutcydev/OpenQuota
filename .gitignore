@@ -14,3 +14,4 @@ dist/
 
 # Real API keys used by verify-endpoints.sh — never commit
 .testkeys.env
+build-sim/

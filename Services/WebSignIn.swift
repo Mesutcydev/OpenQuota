@@ -43,9 +43,17 @@ enum WebSignInKind: String, Hashable {
         case .chatgpt:
             // NextAuth splits a large session token into .0, .1 … chunks;
             // keep every cookie for the host so the chunks and Cloudflare's
-            // clearance travel together.
-            guard mine.contains(where: { $0.name.hasPrefix("__Secure-next-auth.session-token") })
-            else { return nil }
+            // clearance travel together. Login now bounces through
+            // auth.openai.com, so the cookie name may change without notice —
+            // accept the NextAuth family and any plausible session cookie.
+            let sessionNames = ["__Secure-next-auth.session-token",
+                                "next-auth.session-token",
+                                "__Secure-next-auth.session-token.csrf"]
+            let hasSession = mine.contains {
+                sessionNames.contains($0.name) || $0.name.hasPrefix("__Secure-next-auth.session-token")
+                    || $0.name == "__Secure-session-token"
+            }
+            guard hasSession else { return nil }
             return mine.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
         }
     }
@@ -209,10 +217,43 @@ private struct SignInWebView: UIViewRepresentable {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             parent.isLoading = false
             cookiesDidChange(in: webView.configuration.websiteDataStore.httpCookieStore)
+            verifySession(in: webView)
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
             parent.isLoading = false
+        }
+
+        /// The cookie observer alone missed completions when login moved to
+        /// auth.openai.com (cookie names rotate, observer fires late), so the
+        /// sheet stayed open after a successful sign-in. After every finished
+        /// navigation, ask the page itself: fetch the session endpoint with
+        /// the page's own cookies and finish when it reports a live session.
+        /// Only chatgpt.com's own pages run the probe — the auth domain's
+        /// fetch would be cross-origin and useless anyway.
+        private func verifySession(in webView: WKWebView) {
+            guard !delivered else { return }
+            let kind = parent.kind
+            switch kind {
+            case .chatgpt:
+                guard let host = webView.url?.host, host.hasSuffix("chatgpt.com"),
+                      webView.url?.path != "/auth/login" else { return }
+                let script = "fetch('/api/auth/session',{credentials:'include'})"
+                    + ".then(r=>r.json()).then(s=>String(s.accessToken||''))"
+                    + ".catch(()=>'')"
+                webView.evaluateJavaScript(script) { [weak self] result, _ in
+                    guard let self, !self.delivered,
+                          let token = result as? String, !token.isEmpty else { return }
+                    webView.configuration.websiteDataStore.httpCookieStore.getAllCookies {
+                        cookies in
+                        guard let credential = kind.credential(from: cookies) else { return }
+                        self.delivered = true
+                        DispatchQueue.main.async { self.parent.onCredential(credential) }
+                    }
+                }
+            case .claude:
+                break
+            }
         }
     }
 }

@@ -25,18 +25,39 @@ enum Persistence {
     private static let writeQueue = DispatchQueue(
         label: "ai.openquota.persistence", qos: .utility)
 
-    private static var directory: URL {
-        let base = FileManager.default.urls(
+    /// The app previously stored its data in an `OpenUsage` folder (the name
+    /// before the open-source rename). The sandbox survived the update, so
+    /// every JSON file is still on disk — the renamed app just looked in a
+    /// different folder and started "from scratch". Files are copied across
+    /// on first read, once, and from then on only the new folder is used.
+    private static let legacyDirectoryName = "OpenUsage"
+
+    private static var baseDirectory: URL {
+        FileManager.default.urls(
             for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        let folder = base.appendingPathComponent("OpenQuota", isDirectory: true)
+    }
+
+    private static var directory: URL {
+        let folder = baseDirectory.appendingPathComponent("OpenQuota", isDirectory: true)
         try? FileManager.default.createDirectory(
             at: folder, withIntermediateDirectories: true)
         return folder
     }
 
-    static func load<T: Decodable>(_ type: T.Type, from file: String) -> T? {
+    private static func migratedURL(for file: String) -> URL? {
         let url = directory.appendingPathComponent(file)
-        guard let data = try? Data(contentsOf: url) else { return nil }
+        if FileManager.default.fileExists(atPath: url.path) { return url }
+        let legacy = baseDirectory
+            .appendingPathComponent(legacyDirectoryName, isDirectory: true)
+            .appendingPathComponent(file)
+        guard let data = try? Data(contentsOf: legacy) else { return nil }
+        try? data.write(to: url, options: .atomic)
+        return url
+    }
+
+    static func load<T: Decodable>(_ type: T.Type, from file: String) -> T? {
+        guard let url = migratedURL(for: file),
+              let data = try? Data(contentsOf: url) else { return nil }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         do {
