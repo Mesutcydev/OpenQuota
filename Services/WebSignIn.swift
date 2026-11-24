@@ -74,8 +74,8 @@ enum WebSession {
     /// A current mobile Safari user agent. The web apps serve their JSON to
     /// browsers; an unfamiliar agent is more likely to be challenged.
     static let userAgent =
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 "
-        + "(KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1"
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
+        + "(KHTML, like Gecko) Version/17.0 Safari/605.1.15"
 
     static let session: URLSession = {
         let config = URLSessionConfiguration.ephemeral
