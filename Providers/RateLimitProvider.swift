@@ -127,6 +127,7 @@ enum ProviderRegistry {
         DeepgramProvider(),
         FeatherlessProvider(),
         AIMLProvider(),
+        AlibabaProvider(),
         RunwayProvider(),
         // Organization spend
         AnthropicProvider(),
