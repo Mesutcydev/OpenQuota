@@ -15,7 +15,7 @@ enum WebSignInKind: String, Hashable {
         switch self {
         case .claude: return URL(string: "https://claude.ai/login")!
         case .chatgpt: return URL(string: "https://chatgpt.com/auth/login")!
-        case .alibaba: return URL(string: "https://account.alibabacloud.com/login/login.htm?oauth_callback=https%3A%2F%2Fmodelstudio.console.alibabacloud.com%2F&clearRedirectCookie=1")!
+        case .alibaba: return URL(string: "https://account.alibabacloud.com/login/login.htm?oauth_callback=https%3A%2F%2Fwww.alibabacloud.com%2Fen%2Fproduct%2Fmodelstudio%3F_p_lc%3D1%26spm%3Da2c63.p38356.0.0.7aee2cbfp7dzFz&clearRedirectCookie=1")!
         }
     }
 
@@ -171,6 +171,7 @@ final class WebSignInPrewarmer {
         // Non-persistent: the session lives only in the Keychain afterwards,
         // not in a web data store that outlives this sheet.
         configuration.websiteDataStore = .nonPersistent()
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.customUserAgent = WebSession.userAgent
         // Never flash white: the sheet's own canvas shows through until the
@@ -351,7 +352,7 @@ private struct SignInWebView: UIViewRepresentable {
         coordinator.detach(from: webView)
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate, WKHTTPCookieStoreObserver {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKHTTPCookieStoreObserver, WKUIDelegate {
         var parent: SignInWebView
         var lastRetryToken = 0
         private var delivered = false
@@ -365,6 +366,7 @@ private struct SignInWebView: UIViewRepresentable {
         func attach(to webView: WKWebView, retryToken: Int) {
             lastRetryToken = retryToken
             webView.navigationDelegate = self
+            webView.uiDelegate = self
             webView.configuration.websiteDataStore.httpCookieStore.add(self)
             progressObservation = webView.observe(\.estimatedProgress, options: [.initial, .new]) { [weak self] view, _ in
                 let value = view.estimatedProgress
@@ -429,6 +431,26 @@ private struct SignInWebView: UIViewRepresentable {
         private func markReady() {
             stopTimers()
             if parent.phase != .ready { parent.phase = .ready }
+        }
+
+        // Allow the login page to open popups (Google/SSO) in the same view
+        // instead of being silently blocked.
+        func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                     for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+            if navigationAction.targetFrame == nil {
+                webView.load(navigationAction.request)
+            }
+            return nil
+        }
+
+        func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
+                     initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+            completionHandler()
+        }
+
+        func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
+                     initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+            completionHandler(true)
         }
 
         func cookiesDidChange(in cookieStore: WKHTTPCookieStore) {

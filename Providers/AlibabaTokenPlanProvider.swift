@@ -22,7 +22,7 @@ struct AlibabaTokenPlanProvider: UsageProvider {
         caveat: "Personal/Solo Token Plan quota is only exposed through the "
               + "console session, so this provider signs in on the console. "
               + "API keys cannot read it.",
-        webSignIn: nil)
+        webSignIn: .alibaba)
 
     // MARK: - Endpoints
 
