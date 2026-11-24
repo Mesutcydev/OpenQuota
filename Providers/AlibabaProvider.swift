@@ -55,14 +55,35 @@ struct AlibabaProvider: UsageProvider {
         let signature = Self.sign(stringToSign, secret: secret)
         params["Signature"] = signature
 
-        var components = URLComponents(string: "https://business.aliyuncs.com/")!
-        components.queryItems = params.keys.sorted().map { URLQueryItem(name: $0, value: params[$0]) }
-
-        guard let url = components.url else {
-            throw ProviderError.message("Bad URL")
+        // International accounts are served from the Singapore region endpoint;
+        // China-site accounts need business.aliyuncs.com. The signature does not
+        // cover the host, so the same request works against either.
+        let hosts = ["business.ap-southeast-1.aliyuncs.com", "business.aliyuncs.com"]
+        var lastError: Error = ProviderError.message("Bad URL")
+        var responseData: Data? = nil
+        for host in hosts {
+            var components = URLComponents(string: "https://\(host)/")!
+            components.queryItems = params.keys.sorted().map { URLQueryItem(name: $0, value: params[$0]) }
+            guard let url = components.url else { continue }
+            do {
+                let (d, _) = try await HTTP.get(url, headers: [:])
+                responseData = d
+                break
+            } catch {
+                lastError = error
+                let isSiteMismatch: Bool
+                if let pe = error as? ProviderError, case .server(let code, let msg) = pe {
+                    isSiteMismatch = (code == 400) && (msg?.lowercased().contains("auth site") == true || msg?.lowercased().contains("not applicable") == true)
+                } else {
+                    isSiteMismatch = false
+                }
+                if isSiteMismatch { continue }
+                // Retry on any 400 in case the other host is the right one.
+                if let pe = error as? ProviderError, case .server(400, _) = pe { continue }
+                throw error
+            }
         }
-
-        let (data, _) = try await HTTP.get(url, headers: [:])
+        guard let data = responseData else { throw lastError }
 
         guard let object = JSON.object(data) else { throw ProviderError.decoding }
         // Response wraps the payload under "Data" (capital D) on success.
