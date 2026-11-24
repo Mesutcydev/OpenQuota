@@ -60,8 +60,10 @@ enum WebSignInKind: String, Hashable {
             guard hasSession else { return nil }
             return mine.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
         case .alibaba:
-            // Keep every cookie for the host so the session travels together.
-            guard !mine.isEmpty else { return nil }
+            // Only treat the session as established once the real post-login
+            // ticket is present; `isg`/`cna` are set by the login page itself
+            // and would close the sheet before sign-in completes.
+            guard mine.contains(where: { $0.name == "login_aliyunid_ticket" }) else { return nil }
             return mine.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
         }
     }
