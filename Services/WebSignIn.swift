@@ -9,11 +9,13 @@ import WebKit
 enum WebSignInKind: String, Hashable {
     case claude
     case chatgpt
+    case alibaba
 
     var loginURL: URL {
         switch self {
         case .claude: return URL(string: "https://claude.ai/login")!
         case .chatgpt: return URL(string: "https://chatgpt.com/auth/login")!
+        case .alibaba: return URL(string: "https://modelstudio.console.alibabacloud.com/")!
         }
     }
 
@@ -21,6 +23,7 @@ enum WebSignInKind: String, Hashable {
         switch self {
         case .claude: return "claude.ai"
         case .chatgpt: return "chatgpt.com"
+        case .alibaba: return "alibabacloud.com"
         }
     }
 
@@ -28,6 +31,7 @@ enum WebSignInKind: String, Hashable {
         switch self {
         case .claude: return "Claude"
         case .chatgpt: return "ChatGPT"
+        case .alibaba: return "Alibaba"
         }
     }
 
@@ -54,6 +58,10 @@ enum WebSignInKind: String, Hashable {
                     || $0.name == "__Secure-session-token"
             }
             guard hasSession else { return nil }
+            return mine.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
+        case .alibaba:
+            // Keep every cookie for the host so the session travels together.
+            guard !mine.isEmpty else { return nil }
             return mine.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
         }
     }
