@@ -62,46 +62,37 @@ struct AlibabaTokenPlanProvider: UsageProvider {
         let specCode = (subscription?["specCode"] as? String)?.lowercased()
         var fiveHourCeiling: Double?
         var weeklyCeiling: Double?
+        var monthlyCeiling: Double?
         if let qc = quotaConfig, let tier = specCode, let tierObj = qc[tier] as? [String: Any] {
             fiveHourCeiling = JSON.number(tierObj, "five_hour") ?? JSON.number(tierObj, "fiveHour")
             weeklyCeiling = JSON.number(tierObj, "weekly")
+            monthlyCeiling = JSON.number(tierObj, "monthly")
         }
 
         var metrics: [UsageMetric] = []
 
-        if let p5 = JSON.number(usage, "per5HourPercentage") {
-            let resetMs = JSON.number(usage, "per5HourResetTime")
+        // Helper to append a window metric for whichever windows the plan reports.
+        func addWindow(id: String, title: String, pctKey: String, resetKey: String, ceiling: Double?, headline: Bool) {
+            guard let pct = JSON.number(usage, pctKey) else { return }
+            let resetMs = JSON.number(usage, resetKey)
             let resetDate = resetMs.map { Date(timeIntervalSince1970: $0 / 1000) }
-            if let ceiling = fiveHourCeiling, ceiling > 0 {
-                let used = p5 * ceiling
+            if let ceiling, ceiling > 0 {
+                let used = pct * ceiling
                 metrics.append(UsageMetric(
-                    id: "5h", title: "5-hour window", used: used, limit: ceiling,
+                    id: id, title: title, used: used, limit: ceiling,
                     remaining: ceiling - used, unit: .requests,
-                    resetsAt: resetDate, caption: "Credits used", isHeadline: true))
+                    resetsAt: resetDate, caption: "Credits used", isHeadline: headline))
             } else {
                 metrics.append(UsageMetric(
-                    id: "5h", title: "5-hour window", used: p5 * 100, limit: 100,
-                    remaining: (1 - p5) * 100, unit: .percent,
-                    resetsAt: resetDate, caption: "fraction consumed", isHeadline: true))
+                    id: id, title: title, used: pct * 100, limit: 100,
+                    remaining: (1 - pct) * 100, unit: .percent,
+                    resetsAt: resetDate, caption: "fraction consumed", isHeadline: headline))
             }
         }
 
-        if let pw = JSON.number(usage, "per1WeekPercentage") {
-            let resetMs = JSON.number(usage, "per1WeekResetTime")
-            let resetDate = resetMs.map { Date(timeIntervalSince1970: $0 / 1000) }
-            if let ceiling = weeklyCeiling, ceiling > 0 {
-                let used = pw * ceiling
-                metrics.append(UsageMetric(
-                    id: "week", title: "Weekly window", used: used, limit: ceiling,
-                    remaining: ceiling - used, unit: .requests,
-                    resetsAt: resetDate, caption: "Credits used"))
-            } else {
-                metrics.append(UsageMetric(
-                    id: "week", title: "Weekly window", used: pw * 100, limit: 100,
-                    remaining: (1 - pw) * 100, unit: .percent,
-                    resetsAt: resetDate, caption: "fraction consumed"))
-            }
-        }
+        addWindow(id: "5h", title: "5-hour window", pctKey: "per5HourPercentage", resetKey: "per5HourResetTime", ceiling: fiveHourCeiling, headline: true)
+        addWindow(id: "week", title: "Weekly window", pctKey: "per1WeekPercentage", resetKey: "per1WeekResetTime", ceiling: weeklyCeiling, headline: metrics.isEmpty)
+        addWindow(id: "month", title: "Monthly window", pctKey: "per1MonthPercentage", resetKey: "per1MonthResetTime", ceiling: monthlyCeiling, headline: metrics.isEmpty)
 
         if metrics.isEmpty {
             throw ProviderError.decoding
