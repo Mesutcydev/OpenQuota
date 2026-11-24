@@ -9,11 +9,13 @@ import WebKit
 enum WebSignInKind: String, Hashable {
     case claude
     case chatgpt
+    case alibaba
 
     var loginURL: URL {
         switch self {
         case .claude: return URL(string: "https://claude.ai/login")!
         case .chatgpt: return URL(string: "https://chatgpt.com/auth/login")!
+        case .alibaba: return URL(string: "https://account.alibabacloud.com/login/login.htm?oauth_callback=https%3A%2F%2Fwww.alibabacloud.com%2Fen%2Fproduct%2Fmodelstudio%3F_p_lc%3D1%26spm%3Da2c63.p38356.0.0.7aee2cbfp7dzFz&clearRedirectCookie=1")!
         }
     }
 
@@ -21,6 +23,7 @@ enum WebSignInKind: String, Hashable {
         switch self {
         case .claude: return "claude.ai"
         case .chatgpt: return "chatgpt.com"
+        case .alibaba: return "alibabacloud.com"
         }
     }
 
@@ -28,6 +31,7 @@ enum WebSignInKind: String, Hashable {
         switch self {
         case .claude: return "Claude"
         case .chatgpt: return "ChatGPT"
+        case .alibaba: return "Alibaba"
         }
     }
 
@@ -55,6 +59,12 @@ enum WebSignInKind: String, Hashable {
             }
             guard hasSession else { return nil }
             return mine.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
+        case .alibaba:
+            // Only treat the session as established once the real post-login
+            // ticket is present; `isg`/`cna` are set by the login page itself
+            // and would close the sheet before sign-in completes.
+            guard mine.contains(where: { $0.name == "login_aliyunid_ticket" }) else { return nil }
+            return mine.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
         }
     }
 }
@@ -64,8 +74,8 @@ enum WebSession {
     /// A current mobile Safari user agent. The web apps serve their JSON to
     /// browsers; an unfamiliar agent is more likely to be challenged.
     static let userAgent =
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 "
-        + "(KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1"
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
+        + "(KHTML, like Gecko) Version/17.0 Safari/605.1.15"
 
     static let session: URLSession = {
         let config = URLSessionConfiguration.ephemeral
@@ -161,6 +171,7 @@ final class WebSignInPrewarmer {
         // Non-persistent: the session lives only in the Keychain afterwards,
         // not in a web data store that outlives this sheet.
         configuration.websiteDataStore = .nonPersistent()
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.customUserAgent = WebSession.userAgent
         // Never flash white: the sheet's own canvas shows through until the
@@ -341,7 +352,7 @@ private struct SignInWebView: UIViewRepresentable {
         coordinator.detach(from: webView)
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate, WKHTTPCookieStoreObserver {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKHTTPCookieStoreObserver, WKUIDelegate {
         var parent: SignInWebView
         var lastRetryToken = 0
         private var delivered = false
@@ -355,6 +366,7 @@ private struct SignInWebView: UIViewRepresentable {
         func attach(to webView: WKWebView, retryToken: Int) {
             lastRetryToken = retryToken
             webView.navigationDelegate = self
+            webView.uiDelegate = self
             webView.configuration.websiteDataStore.httpCookieStore.add(self)
             progressObservation = webView.observe(\.estimatedProgress, options: [.initial, .new]) { [weak self] view, _ in
                 let value = view.estimatedProgress
@@ -419,6 +431,26 @@ private struct SignInWebView: UIViewRepresentable {
         private func markReady() {
             stopTimers()
             if parent.phase != .ready { parent.phase = .ready }
+        }
+
+        // Allow the login page to open popups (Google/SSO) in the same view
+        // instead of being silently blocked.
+        func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                     for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+            if navigationAction.targetFrame == nil {
+                webView.load(navigationAction.request)
+            }
+            return nil
+        }
+
+        func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
+                     initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+            completionHandler()
+        }
+
+        func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
+                     initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+            completionHandler(true)
         }
 
         func cookiesDidChange(in cookieStore: WKHTTPCookieStore) {

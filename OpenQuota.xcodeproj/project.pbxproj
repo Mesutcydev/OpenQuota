@@ -26,6 +26,8 @@
 		4A37347E03204C9760732E17 /* PoeProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E883B146E6D39756D00DCFD /* PoeProvider.swift */; };
 		4C2EABBF62A9A372F5033A49 /* CopilotProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A58D2113058DFC5E34DDC9 /* CopilotProvider.swift */; };
 		4F551321F5C2B3CFCE89F029 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD873B531E9E17265C410654 /* Theme.swift */; };
+		57D1AC9E28B1A83C8A02C717 /* AlibabaProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2413D01BEA3BD20BDAFBD76F /* AlibabaProvider.swift */; };
+		5FA72E1A572E0E4F9F26EA7F /* AlibabaTokenPlanProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45074CBD0FEAC7114EADCA56 /* AlibabaTokenPlanProvider.swift */; };
 		6420B787805EAECE92AA8430 /* FeatherlessProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 942497830BF0019975C07750 /* FeatherlessProvider.swift */; };
 		69F0993C76AAEE9B95EEA4DC /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 876A07EBD9968D180CB14EA7 /* Components.swift */; };
 		6EC3D6332804C6EBF7B984E6 /* OpenQuotaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 041591206680BDD2550A7C50 /* OpenQuotaApp.swift */; };
@@ -115,7 +117,9 @@
 		21C7ECE1D9355A762BA21434 /* WatchSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchSync.swift; sourceTree = "<group>"; };
 		21FF8B33B3C8029E4F59F438 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		22E006C75274D8DB09D16DA1 /* UsageIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageIntents.swift; sourceTree = "<group>"; };
+		2413D01BEA3BD20BDAFBD76F /* AlibabaProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlibabaProvider.swift; sourceTree = "<group>"; };
 		36FFF2239DF91FCB71057055 /* DemoData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoData.swift; sourceTree = "<group>"; };
+		45074CBD0FEAC7114EADCA56 /* AlibabaTokenPlanProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlibabaTokenPlanProvider.swift; sourceTree = "<group>"; };
 		4697CA9117DF97DE1D89DB06 /* BackgroundRefresh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundRefresh.swift; sourceTree = "<group>"; };
 		4D912B616319CABB164E8F3D /* Pace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pace.swift; sourceTree = "<group>"; };
 		5025E15749AFD256EA99AF63 /* TogetherProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TogetherProvider.swift; sourceTree = "<group>"; };
@@ -186,6 +190,8 @@
 			isa = PBXGroup;
 			children = (
 				5B1E1F09A5AE10B1D4C008D6 /* AIMLProvider.swift */,
+				2413D01BEA3BD20BDAFBD76F /* AlibabaProvider.swift */,
+				45074CBD0FEAC7114EADCA56 /* AlibabaTokenPlanProvider.swift */,
 				95356D6BCCCE83582BB9A74D /* AnthropicProvider.swift */,
 				D2796CD79BC4604D3FD13363 /* ChatGPTSubscriptionProvider.swift */,
 				AF5C9A0139B1421ACAFED04B /* ClaudeSubscriptionProvider.swift */,
@@ -420,6 +426,8 @@
 				2C30AC70C3632BB9AA3BC9C6 /* AccountDetailView.swift in Sources */,
 				9572EC6B3449473F9D85F043 /* AccountsView.swift in Sources */,
 				1349006FD53A084BF34BAF17 /* AddAccountView.swift in Sources */,
+				57D1AC9E28B1A83C8A02C717 /* AlibabaProvider.swift in Sources */,
+				5FA72E1A572E0E4F9F26EA7F /* AlibabaTokenPlanProvider.swift in Sources */,
 				9ADAE0C467700E27E69FACC9 /* Ambient.swift in Sources */,
 				1F2BC42B8E6CB89A7661F0BF /* AnthropicProvider.swift in Sources */,
 				7C61A905E6716D40468653E5 /* AppLock.swift in Sources */,

@@ -127,6 +127,7 @@ enum ProviderRegistry {
         DeepgramProvider(),
         FeatherlessProvider(),
         AIMLProvider(),
+        AlibabaProvider(),
         RunwayProvider(),
         // Organization spend
         AnthropicProvider(),
@@ -139,6 +140,7 @@ enum ProviderRegistry {
         RateLimitProvider.groq,
         RateLimitProvider.cerebras,
         RateLimitProvider.custom,
+        AlibabaTokenPlanProvider(),
     ]
 
     /// Connect list grouped by what the provider can actually tell you.
