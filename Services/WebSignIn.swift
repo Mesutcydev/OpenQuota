@@ -15,7 +15,7 @@ enum WebSignInKind: String, Hashable {
         switch self {
         case .claude: return URL(string: "https://claude.ai/login")!
         case .chatgpt: return URL(string: "https://chatgpt.com/auth/login")!
-        case .alibaba: return URL(string: "https://modelstudio.console.alibabacloud.com/")!
+        case .alibaba: return URL(string: "https://account.alibabacloud.com/login/login.htm?oauth_callback=https%3A%2F%2Fmodelstudio.console.alibabacloud.com%2F&clearRedirectCookie=1")!
         }
     }
 
